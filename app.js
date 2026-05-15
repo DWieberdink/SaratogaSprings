@@ -2264,9 +2264,17 @@
     return !!(c && c.checked);
   }
 
+  function setTractsLayerData(fc) {
+    if (!map || !map.getSource || !map.getSource("tracts")) return;
+    try {
+      map.getSource("tracts").setData(fc);
+    } catch (eSet) {
+      /* ignore */
+    }
+  }
+
   function refreshChoroplethFromSelection() {
     if (!STATE.tractBase) return;
-    if (!map || !map.getSource("tracts")) return;
     updateMapToolbarContext();
     if (isMapDriverAcsAge()) {
       if (!STATE.acsAgeRaw) {
@@ -2277,11 +2285,7 @@
           STATE.studyRadiusMiles,
           false
         );
-        try {
-          map.getSource("tracts").setData(STATE.currentJoinedFc);
-        } catch (eAc0) {
-          /* ignore */
-        }
+        setTractsLayerData(STATE.currentJoinedFc);
         applyNeutralTractFillPaint();
         syncLegend(null, null, currentModeCount(), "ACS age data not loaded");
         refreshTractTooltipContent();
@@ -2296,11 +2300,7 @@
           STATE.studyRadiusMiles,
           false
         );
-        try {
-          map.getSource("tracts").setData(STATE.currentJoinedFc);
-        } catch (eAc1) {
-          /* ignore */
-        }
+        setTractsLayerData(STATE.currentJoinedFc);
         applyNeutralTractFillPaint();
         syncLegend(null, null, currentModeCount(), "Select ACS year in Population & aging");
         refreshTractTooltipContent();
@@ -2318,11 +2318,7 @@
       var finalFc =
         mm.low != null && mm.high != null ? augmentJoinedWithSqrtNorm(joined, mm.low, mm.high) : joined;
       STATE.currentJoinedFc = finalFc;
-      try {
-        map.getSource("tracts").setData(finalFc);
-      } catch (eAc2) {
-        /* ignore */
-      }
+      setTractsLayerData(finalFc);
       var legendTitle =
         "Selected age groups — ACS " + y + (modeCount ? " (people)" : " (% of tract)");
       if (mm.low != null && mm.high != null) {
@@ -2351,11 +2347,7 @@
         STATE.studyRadiusMiles,
         false
       );
-      try {
-        map.getSource("tracts").setData(STATE.currentJoinedFc);
-      } catch (e0) {
-        /* ignore */
-      }
+      setTractsLayerData(STATE.currentJoinedFc);
       applyNeutralTractFillPaint();
       syncLegend(null, null, false, "Select a measure");
       updateKpis(
@@ -2399,25 +2391,21 @@
       STATE.studyRadiusMiles
     );
     updateTrendCharts(ts);
-    var modeCount = currentModeCount();
-    var joined = joinTracts(STATE.tractBase, idx, modeCount, STATE.studyRadiusMiles, true);
-    var mm = computeChoroplethRampBounds(joined, modeCount);
-    var finalFc =
-      mm.low != null && mm.high != null ? augmentJoinedWithSqrtNorm(joined, mm.low, mm.high) : joined;
-    STATE.currentJoinedFc = finalFc;
+    var modeCount2 = currentModeCount();
+    var joined2 = joinTracts(STATE.tractBase, idx, modeCount2, STATE.studyRadiusMiles, true);
+    var mm2 = computeChoroplethRampBounds(joined2, modeCount2);
+    var finalFc2 =
+      mm2.low != null && mm2.high != null ? augmentJoinedWithSqrtNorm(joined2, mm2.low, mm2.high) : joined2;
+    STATE.currentJoinedFc = finalFc2;
 
-    try {
-      map.getSource("tracts").setData(finalFc);
-    } catch (e1) {
-      /* ignore */
-    }
-    var legendTitle = (helperEntry && helperEntry.shortLabel) || "Selected measure";
-    if (mm.low != null && mm.high != null) {
+    setTractsLayerData(finalFc2);
+    var legendTitle2 = (helperEntry && helperEntry.shortLabel) || "Selected measure";
+    if (mm2.low != null && mm2.high != null) {
       applyChoroplethPaint();
-      syncLegend(mm.low, mm.high, modeCount, legendTitle);
+      syncLegend(mm2.low, mm2.high, modeCount2, legendTitle2);
     } else {
       applyNeutralTractFillPaint();
-      syncLegend(null, null, modeCount, legendTitle);
+      syncLegend(null, null, modeCount2, legendTitle2);
     }
     updateKpis(stats, helperEntry);
     refreshTractTooltipContent();

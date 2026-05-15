@@ -7,6 +7,7 @@
  * if your org blocks them; use GitHub repo secrets + Actions to inject on deploy instead).
  */
 window.__SaratogaSiteConfig = {
+  /* Paste your public Mapbox token (pk.…) here for the map; leave empty to use sidebar/charts only. */
   mapboxAccessToken: "",
   dashboardPassword: "",
 };
