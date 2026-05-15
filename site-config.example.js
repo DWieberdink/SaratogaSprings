@@ -1,9 +1,6 @@
 /**
- * Backup template — the live file is site-config.js (tracked, empty by default for GitHub Pages).
- * Copy this over site-config.js if you need to reset, then add your Mapbox pk token locally.
- *
- * Public Mapbox token: https://account.mapbox.com/access-tokens/
- * Optional: set dashboardPassword to enable the login gate.
+ * Backup template — the app loads site-config.js from the repo root.
+ * Same shape as site-config.js; use localStorage key saratoga_mapbox_pk if you prefer not to edit files.
  */
 window.__SaratogaSiteConfig = {
   mapboxAccessToken: "",

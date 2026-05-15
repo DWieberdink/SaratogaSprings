@@ -1,14 +1,42 @@
 (function () {
   "use strict";
 
-  /** Read at use time so optional scripts (e.g. after site-config.js) can set window.__SaratogaSiteConfig. */
+  /**
+   * Mapbox public token (pk.…), read in order:
+   * 1) window.__SaratogaSiteConfig.mapboxAccessToken (site-config.js)
+   * 2) localStorage "saratoga_mapbox_pk" (survives reload; good when you cannot edit committed site-config.js)
+   * 3) sessionStorage "saratoga_mapbox_pk"
+   * 4) URL query mapbox_pk=… (local testing only; token may appear in browser history)
+   */
   function getMapboxAccessToken() {
-    return (
-      (typeof window !== "undefined" &&
-        window.__SaratogaSiteConfig &&
-        String(window.__SaratogaSiteConfig.mapboxAccessToken || "").trim()) ||
-      ""
-    );
+    var cfg = typeof window !== "undefined" && window.__SaratogaSiteConfig ? window.__SaratogaSiteConfig : null;
+    var t = cfg && String(cfg.mapboxAccessToken != null ? cfg.mapboxAccessToken : "").trim();
+    if (t) return t;
+    try {
+      if (typeof localStorage !== "undefined") {
+        var ls = localStorage.getItem("saratoga_mapbox_pk");
+        if (ls) return String(ls).trim();
+      }
+    } catch (eLs) {
+      /* ignore */
+    }
+    try {
+      if (typeof sessionStorage !== "undefined") {
+        var ss = sessionStorage.getItem("saratoga_mapbox_pk");
+        if (ss) return String(ss).trim();
+      }
+    } catch (eSs) {
+      /* ignore */
+    }
+    try {
+      if (typeof location !== "undefined" && location.search) {
+        var m = location.search.match(/(?:^|[?&])mapbox_pk=([^&]+)/);
+        if (m && m[1]) return decodeURIComponent(m[1].replace(/\+/g, " ")).trim();
+      }
+    } catch (eQ) {
+      /* ignore */
+    }
+    return "";
   }
 
   /**
@@ -3018,8 +3046,12 @@
     if (mapMissingEl) {
       mapMissingEl.innerHTML =
         '<div style="padding:20px 22px;font:500 14px/1.55 system-ui,-apple-system,sans-serif;color:#0f172a;background:#f1f5f9;min-height:240px;box-sizing:border-box">' +
-        "<strong>No Mapbox token.</strong> Edit <code style=\"background:#e2e8f0;padding:1px 6px;border-radius:4px\">site-config.js</code> and set <code style=\"background:#e2e8f0;padding:1px 6px;border-radius:4px\">mapboxAccessToken</code> to your public token (<code style=\"background:#e2e8f0;padding:1px 6px;border-radius:4px\">pk.…</code>). " +
-        "PLACES and tract summaries below load from local files in <code style=\"background:#e2e8f0;padding:1px 6px;border-radius:4px\">/data</code> and should appear shortly.</div>";
+        "<strong>No Mapbox token found.</strong> Use any one of the following, then reload this page:<br><br>" +
+        "• Edit <code style=\"background:#e2e8f0;padding:1px 6px;border-radius:4px\">site-config.js</code> — set <code style=\"background:#e2e8f0;padding:1px 6px;border-radius:4px\">mapboxAccessToken</code> to your public <code style=\"background:#e2e8f0;padding:1px 6px;border-radius:4px\">pk.…</code> token from " +
+        '<a href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noopener">mapbox.com</a>.<br><br>' +
+        "• Or in the browser devtools console: " +
+        '<code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:0.85em">localStorage.setItem(\"saratoga_mapbox_pk\",\"YOUR_pk_TOKEN_HERE\"); location.reload()</code><br><br>' +
+        "Charts use local <code style=\"background:#e2e8f0;padding:1px 6px;border-radius:4px\">/data</code> files; only the map needs Mapbox.</div>";
     }
     runInitialDashboardLoad();
   }
