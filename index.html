@@ -376,13 +376,13 @@
           t.src = "https://cdn.jsdelivr.net/npm/@turf/turf@7.2.0/turf.min.js";
           t.onload = function () {
             var s = document.createElement("script");
-            s.src = "app.js";
+            s.src = "app.js?v=5";
             document.body.appendChild(s);
           };
           t.onerror = function () {
             console.error("Could not load Turf.js");
             var s2 = document.createElement("script");
-            s2.src = "app.js";
+            s2.src = "app.js?v=5";
             document.body.appendChild(s2);
           };
           document.body.appendChild(t);
