@@ -1,11 +1,32 @@
 (function () {
   "use strict";
 
-  var MAPBOX_ACCESS_TOKEN =
-    (typeof window !== "undefined" &&
-      window.__SaratogaSiteConfig &&
-      String(window.__SaratogaSiteConfig.mapboxAccessToken || "").trim()) ||
-    "";
+  /** Read at use time so optional scripts (e.g. after site-config.js) can set window.__SaratogaSiteConfig. */
+  function getMapboxAccessToken() {
+    return (
+      (typeof window !== "undefined" &&
+        window.__SaratogaSiteConfig &&
+        String(window.__SaratogaSiteConfig.mapboxAccessToken || "").trim()) ||
+      ""
+    );
+  }
+
+  /**
+   * Resolve relative data paths against the HTML document URL (correct on GitHub Pages project sites, subfolders, etc.).
+   */
+  function resolveAssetUrl(path) {
+    var p = String(path == null ? "" : path).trim();
+    if (!p) return p;
+    if (/^https?:\/\//i.test(p)) return p;
+    try {
+      if (typeof document !== "undefined" && document.baseURI) {
+        return new URL(p, document.baseURI).href;
+      }
+    } catch (eR) {
+      /* fall through */
+    }
+    return p;
+  }
 
   var MAPBOX_STYLES = {
     light: "mapbox://styles/mapbox/light-v11",
@@ -310,9 +331,10 @@
   }
 
   function fetchGeoJsonOk(url) {
-    return fetch(url).then(function (r) {
+    var u = resolveAssetUrl(url);
+    return fetch(u).then(function (r) {
       if (!r.ok) {
-        throw new Error("Could not load " + url + " (" + r.status + " " + r.statusText + ")");
+        throw new Error("Could not load " + u + " (" + r.status + " " + r.statusText + ")");
       }
       return r.json();
     });
@@ -1706,7 +1728,7 @@
   function tryFetchAcsAge() {
     if (STATE.acsAgeFetched || STATE.acsAgeFetchInFlight) return;
     STATE.acsAgeFetchInFlight = true;
-    fetch(ACS_AGE_GEOJSON_URL)
+    fetch(resolveAssetUrl(ACS_AGE_GEOJSON_URL))
       .then(function (r) {
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
@@ -2951,7 +2973,7 @@
           features: placesFc && placesFc.features ? placesFc.features : [],
         };
         STATE.placesRaw = placesClean;
-        return fetch(PLACES_MANIFEST_URL)
+        return fetch(resolveAssetUrl(PLACES_MANIFEST_URL))
           .then(function (r) {
             return r.ok ? r.json() : null;
           })
@@ -2975,7 +2997,10 @@
           errEl.hidden = false;
           errEl.textContent =
             "Could not load dashboard data. Check the browser console and verify files in /data exist. " +
-            msg;
+            msg +
+            (String(msg).indexOf("PLACES_saratoga") >= 0
+              ? " The PLACES extract is large (~56 MB); GitHub Pages or slow networks may time out—try npm run dev locally."
+              : "");
         }
         wireUiAfterData();
       })
@@ -2984,8 +3009,9 @@
       });
   }
 
-  if (MAPBOX_ACCESS_TOKEN) {
-    mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
+  var mapboxTokenAtInit = getMapboxAccessToken();
+  if (mapboxTokenAtInit) {
+    mapboxgl.accessToken = mapboxTokenAtInit;
     map = new mapboxgl.Map({
       container: "map",
       style: MAPBOX_STYLES.light,
