@@ -1,3 +1,6 @@
+# Local site secrets (Mapbox pk token, optional dashboard password) — copy from site-config.example.js
+site-config.js
+
 # Local Census Data API key (optional alternative to CENSUS_API_KEY)
 data/.census-api-key
 

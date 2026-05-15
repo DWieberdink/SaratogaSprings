@@ -940,15 +940,14 @@ body.dashboard-unlocked {
   gap: 12px;
 }
 
-.map-tract-fill-row {
+.map-display-context-row {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid #e5e7eb;
 }
 
-.map-tract-fill-row__label {
-  display: block;
-  margin: 0 0 5px;
+.map-display-context-row__label {
+  margin: 0 0 4px;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -956,17 +955,49 @@ body.dashboard-unlocked {
   color: #6b7280;
 }
 
-.school-select--map-fill {
-  width: 100%;
-  margin: 0 0 4px;
-  font-size: 0.8rem;
+.map-display-context {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #374151;
 }
 
-.map-tract-fill-row__hint {
+.aging-map-driver {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Map driver lives in the map toolbar layers stack — no top rule (first block in panel). */
+.aging-map-driver--toolbar {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.aging-map-driver__options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.aging-map-driver__opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin: 0;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
   line-height: 1.35;
-  color: #6b7280;
+}
+
+.aging-map-driver__opt input {
+  margin: 2px 0 0;
+  accent-color: #2563eb;
+  flex-shrink: 0;
 }
 
 .study-radius-row {

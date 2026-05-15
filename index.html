@@ -260,6 +260,23 @@
           <div class="toolbar-panel" id="toolbar-panel">
             <section class="layer-section layer-section--map-menu" aria-label="Map layers">
               <div class="map-layers-menu-stack">
+                <div
+                  class="aging-map-driver aging-map-driver--toolbar"
+                  role="radiogroup"
+                  aria-labelledby="aging-map-driver-label"
+                >
+                  <span class="control-field-label" id="aging-map-driver-label">What the map shows</span>
+                  <div class="aging-map-driver__options">
+                    <label class="aging-map-driver__opt">
+                      <input type="radio" name="map-tract-driver" id="map-tract-driver-health" value="health" checked />
+                      <span>Health measure (sidebar)</span>
+                    </label>
+                    <label class="aging-map-driver__opt">
+                      <input type="radio" name="map-tract-driver" id="map-tract-driver-acs" value="acs" />
+                      <span>Selected age groups (ACS)</span>
+                    </label>
+                  </div>
+                </div>
                 <div class="toggles choropleth-mode-toggles" role="group" aria-label="Choropleth value type">
                   <label>
                     <input type="checkbox" id="choropleth-percent" checked />
@@ -276,18 +293,9 @@
                     </span>
                   </label>
                 </div>
-                <div class="map-tract-fill-row">
-                  <label class="map-tract-fill-row__label" for="map-tract-fill-select">Tract fill</label>
-                  <select id="map-tract-fill-select" class="school-select school-select--map-fill" aria-label="What to show on the tract choropleth map">
-                    <option value="health">Health measure (sidebar)</option>
-                    <option value="acs:under_18">ACS age: Under 18</option>
-                    <option value="acs:g18_34">ACS age: 18–34</option>
-                    <option value="acs:g35_54">ACS age: 35–54</option>
-                    <option value="acs:g55_64">ACS age: 55–64</option>
-                    <option value="acs:g65_84">ACS age: 65–84</option>
-                    <option value="acs:g85_up">ACS age: 85+</option>
-                  </select>
-                  <p class="map-tract-fill-row__hint" id="map-tract-fill-hint" aria-live="polite"></p>
+                <div class="map-display-context-row">
+                  <p class="map-display-context-row__label">Current tract colors</p>
+                  <p class="map-display-context" id="map-display-context" aria-live="polite"></p>
                 </div>
                 <div class="study-radius-row">
                   <div class="study-radius-row__header">
@@ -336,6 +344,12 @@
     </div>
 
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js"></script>
+    <script>
+      window.__SaratogaSiteConfig = window.__SaratogaSiteConfig || {
+        mapboxAccessToken: "",
+        dashboardPassword: "",
+      };
+    </script>
     <script src="site-config.js"></script>
     <script>
       (function () {

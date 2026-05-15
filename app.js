@@ -91,23 +91,64 @@
     };
   }
 
-  function getMapTractFillMode() {
-    var el = document.getElementById("map-tract-fill-select");
-    var v = el && el.value ? String(el.value) : "health";
-    if (v.indexOf("acs:") === 0) return { kind: "acs", band: v.slice(4) };
-    return { kind: "health" };
+  function isMapDriverAcsAge() {
+    var r = document.querySelector('input[name="map-tract-driver"]:checked');
+    return !!(r && r.value === "acs");
   }
 
-  function updateMapTractFillHint() {
-    var hint = document.getElementById("map-tract-fill-hint");
-    if (!hint) return;
-    var m = getMapTractFillMode();
-    if (m.kind === "health") {
-      hint.textContent =
-        "Percent / count use CDC PLACES for the selected health measure. Choose an ACS age band to map where people in each group live (tract share or count).";
+  function getSelectedAgeGroupLabelsForMap() {
+    ensureAcsBinEnabledDefaults();
+    var out = [];
+    var i;
+    for (i = 0; i < ACS_DISPLAY_ORDER.length; i++) {
+      var k = ACS_DISPLAY_ORDER[i];
+      if (STATE.acsBinEnabled[k] !== false) out.push(formatAcsBinLabel(k));
+    }
+    return out;
+  }
+
+  function countEnabledAcsDisplayGroups() {
+    ensureAcsBinEnabledDefaults();
+    var c = 0;
+    var i;
+    for (i = 0; i < ACS_DISPLAY_ORDER.length; i++) {
+      if (STATE.acsBinEnabled[ACS_DISPLAY_ORDER[i]] !== false) c++;
+    }
+    return c;
+  }
+
+  function updateMapToolbarContext() {
+    var el = document.getElementById("map-display-context");
+    if (!el) return;
+    if (isMapDriverAcsAge()) {
+      var labels = getSelectedAgeGroupLabelsForMap();
+      var y = STATE.selectedAcsYear != null && isFinite(Number(STATE.selectedAcsYear)) ? String(STATE.selectedAcsYear) : "—";
+      if (!labels.length) {
+        el.textContent =
+          "ACS " + y + ": pick at least one age group under Population & aging to color tracts.";
+      } else {
+        el.textContent =
+          "ACS " +
+          y +
+          ": tracts reflect your selected groups (" +
+          labels.join(", ") +
+          "). Use Percentage / Estimated count below for share of tract population vs. people in those groups.";
+      }
     } else {
-      hint.textContent =
-        "Uses the ACS 5-year end-year from Population & aging. Percent = this band as a share of modeled tract population (all six groups). Count = people in the band.";
+      var sel = document.getElementById("metric-select");
+      var raw = sel && sel.value ? sel.value : "";
+      var parsed = parseMeasureKey(raw);
+      if (!parsed) {
+        el.textContent =
+          "Choose a health measure above. Percentage = crude PLACES rate; Estimated count = rate × tract adult population.";
+      } else {
+        var ent = getCatalogEntryForDisplay(raw, STATE.selectedSurveyYear);
+        var lab = ent && ent.shortLabel ? String(ent.shortLabel).trim() : "Selected measure";
+        el.textContent =
+          "Showing " +
+          lab +
+          " (CDC PLACES). Percentage = crude prevalence; Estimated count = prevalence × adult population (18+).";
+      }
     }
   }
 
@@ -127,13 +168,15 @@
     return out;
   }
 
-  function joinTractsFromAcsAge(tractFc, geoidDisplayMap, bandKey, modeCount, radiusMiles) {
+  function joinTractsFromAcsSelectedGroups(tractFc, geoidDisplayMap, modeCount, radiusMiles) {
+    ensureAcsBinEnabledDefaults();
     var rm =
       radiusMiles != null && isFinite(Number(radiusMiles))
         ? Number(radiusMiles)
         : STATE.studyRadiusMiles;
     var feats = tractFc && tractFc.features ? tractFc.features : [];
     var out = [];
+    var enabledCt = countEnabledAcsDisplayGroups();
     var i;
     for (i = 0; i < feats.length; i++) {
       var f = feats[i];
@@ -143,27 +186,31 @@
       p.choropleth_in_radius = inR;
       p.dashboard_measure_selected = false;
       p.dashboard_map_fill_kind = "acs";
-      p.dashboard_acs_band_key = bandKey;
+      p.dashboard_acs_band_key = "selection";
       var disp = gid ? geoidDisplayMap[gid] : null;
-      var total = 0;
+      var totalSix = 0;
+      var selectedSum = 0;
       if (disp) {
         var dj;
         for (dj = 0; dj < ACS_DISPLAY_ORDER.length; dj++) {
-          total += Number(disp[ACS_DISPLAY_ORDER[dj]] || 0);
+          var key = ACS_DISPLAY_ORDER[dj];
+          var part = Number(disp[key] || 0);
+          if (!isFinite(part)) part = 0;
+          totalSix += part;
+          if (STATE.acsBinEnabled[key] !== false) selectedSum += part;
         }
       }
-      var band = disp && isFinite(Number(disp[bandKey])) ? Number(disp[bandKey]) : 0;
-      var has = !!(disp && total > 0 && isFinite(band));
-      var sharePct = has && total > 0 ? (100 * band) / total : null;
+      var has = !!(disp && totalSix > 0 && enabledCt > 0);
+      var sharePct = has && totalSix > 0 ? (100 * selectedSum) / totalSix : null;
       var v = null;
       if (has && inR) {
-        v = modeCount ? band : sharePct;
+        v = modeCount ? selectedSum : sharePct;
       }
       p.choropleth_has_data = has;
       p.choropleth_value = v != null && isFinite(v) ? v : 0;
       p.choropleth_pct = sharePct;
-      p.choropleth_count_est = band;
-      p.choropleth_pop18 = total > 0 ? total : null;
+      p.choropleth_count_est = selectedSum;
+      p.choropleth_pop18 = totalSix > 0 ? totalSix : null;
       p.choropleth_sqrt_norm = 0;
       out.push({ type: "Feature", geometry: f.geometry, properties: p });
     }
@@ -1174,6 +1221,7 @@
       STATE.acsBinEnabled[bin] = t.checked;
       updateAgingBandDropdownSummary();
       refreshAcsAgingDependentCharts();
+      refreshChoroplethFromSelection();
     }
     host.addEventListener("change", onAgingBandCheckbox);
   }
@@ -1440,6 +1488,7 @@
       if (bulkSel) bulkSel.disabled = true;
       var emptyPanel = document.getElementById("aging-band-panel");
       if (emptyPanel) emptyPanel.hidden = true;
+      updateMapToolbarContext();
       return;
     }
     ensureAcsBinEnabledDefaults();
@@ -1463,6 +1512,7 @@
     else detail = c + " of " + total + " age groups";
     sumEl.textContent = detail;
     if (trig) trig.setAttribute("aria-valuetext", detail);
+    updateMapToolbarContext();
   }
 
   function setAgingBandDropdownOpen(open) {
@@ -1506,6 +1556,7 @@
           }
           renderAgingBandToggles();
           refreshAcsAgingDependentCharts();
+          refreshChoroplethFromSelection();
         } else if (v === "__none__") {
           ensureAcsBinEnabledDefaults();
           var jn;
@@ -1514,6 +1565,7 @@
           }
           renderAgingBandToggles();
           refreshAcsAgingDependentCharts();
+          refreshChoroplethFromSelection();
         }
         bulkSel.value = "";
       });
@@ -1727,7 +1779,7 @@
         acsSlider.setAttribute("aria-valuetext", "ACS 5-year estimate " + y);
         syncAcsBaselineYearSelect(STATE.acsAgeRaw);
         refreshAgingVisualization();
-        if (getMapTractFillMode().kind === "acs") {
+        if (isMapDriverAcsAge()) {
           refreshChoroplethFromSelection();
         }
       }
@@ -1744,6 +1796,14 @@
     }
     wireAgingBandTogglesHost();
     wireAgingBandDropdown();
+    var mapDriverHealth = document.getElementById("map-tract-driver-health");
+    var mapDriverAcs = document.getElementById("map-tract-driver-acs");
+    function onMapDriverChange() {
+      updateMapToolbarContext();
+      refreshChoroplethFromSelection();
+    }
+    if (mapDriverHealth) mapDriverHealth.addEventListener("change", onMapDriverChange);
+    if (mapDriverAcs) mapDriverAcs.addEventListener("change", onMapDriverChange);
   }
 
   function joinTracts(tractFc, idx, modeCount, radiusMiles, measureSelected) {
@@ -2185,10 +2245,8 @@
   function refreshChoroplethFromSelection() {
     if (!STATE.tractBase) return;
     if (!map || !map.getSource("tracts")) return;
-    updateMapTractFillHint();
-    var fill = getMapTractFillMode();
-
-    if (fill.kind === "acs") {
+    updateMapToolbarContext();
+    if (isMapDriverAcsAge()) {
       if (!STATE.acsAgeRaw) {
         STATE.currentJoinedFc = joinTracts(
           STATE.tractBase,
@@ -2228,10 +2286,9 @@
       }
       var geoMap = buildGeoidAcsDisplayMap(y);
       var modeCount = currentModeCount();
-      var joined = joinTractsFromAcsAge(
+      var joined = joinTractsFromAcsSelectedGroups(
         STATE.tractBase,
         geoMap,
-        fill.band,
         modeCount,
         STATE.studyRadiusMiles
       );
@@ -2244,8 +2301,8 @@
       } catch (eAc2) {
         /* ignore */
       }
-      var bandLab = formatAcsBinLabel(fill.band);
-      var legendTitle = bandLab + " — ACS " + y + (modeCount ? " (people)" : " (% of tract)");
+      var legendTitle =
+        "Selected age groups — ACS " + y + (modeCount ? " (people)" : " (% of tract)");
       if (mm.low != null && mm.high != null) {
         applyChoroplethPaint();
         syncLegend(mm.low, mm.high, modeCount, legendTitle);
@@ -2412,17 +2469,16 @@
     return g || "—";
   }
 
-  /** PLACES crude rate + count, or ACS age band when map fill is ACS. */
+  /** PLACES crude rate + count, or ACS selected groups when map driver is ACS. */
   function tractTooltipHtml(props) {
-    var fill = getMapTractFillMode();
-    if (fill.kind === "acs") {
+    if (isMapDriverAcsAge()) {
       var tractLabA = tractTooltipTractLabel(props);
       var acsY =
         STATE.selectedAcsYear != null && isFinite(Number(STATE.selectedAcsYear))
           ? String(STATE.selectedAcsYear)
           : "—";
       var kickerA = ("Census tract " + tractLabA + " · ACS " + acsY).toUpperCase();
-      var bandTitle = formatAcsBinLabel(fill.band);
+      var groupLine = getSelectedAgeGroupLabelsForMap().join(", ") || "—";
       var hasA = props && props.choropleth_has_data;
       var share = props && props.choropleth_pct != null ? Number(props.choropleth_pct) : NaN;
       var cntA = props && props.choropleth_count_est != null ? props.choropleth_count_est : null;
@@ -2440,12 +2496,12 @@
         metricsBlockA =
           '<div class="' +
           rowPctClassA +
-          '">Share of tract (six ACS groups): ' +
+          '">Share in selected groups (of tract total): ' +
           escapeHtml(isFinite(share) ? share.toFixed(1) + "%" : "—") +
           "</div>" +
           '<div class="' +
           rowCntClassA +
-          '">People in band: ' +
+          '">People in selected groups: ' +
           escapeHtml(
             cntA != null && isFinite(Number(cntA)) ? Math.round(Number(cntA)).toLocaleString() : "—"
           ) +
@@ -2467,7 +2523,7 @@
         escapeHtml(kickerA) +
         "</div>" +
         '<div class="school-hover-row tract-tooltip-metric tract-tip-emphasis">' +
-        escapeHtml(bandTitle) +
+        escapeHtml(groupLine) +
         "</div>" +
         metricsBlockA +
         extraTotA +
@@ -2604,6 +2660,7 @@
   }
 
   function addTractLayers(initialFc) {
+    if (!map) return;
     if (!map.getSource("tracts")) {
       map.addSource("tracts", {
         type: "geojson",
@@ -2711,7 +2768,7 @@
       px = clampSidebarWidth(px);
       sidebar.style.flex = "0 0 " + px + "px";
       sidebar.style.width = px + "px";
-      map.resize();
+      if (map && typeof map.resize === "function") map.resize();
     }
     resizer.addEventListener("mousedown", function (e) {
       dragging = true;
@@ -2744,6 +2801,7 @@
 
   function setMapboxBasemap(mode) {
     if (!MAPBOX_STYLES[mode]) return;
+    if (!map) return;
     var root = document.getElementById("basemap-toggle");
     if (root) {
       root.querySelectorAll("[data-basemap]").forEach(function (btn) {
@@ -2780,14 +2838,7 @@
     initDashboardResizer();
     wireChoroplethModeCheckboxes();
 
-    var mapFillSel = document.getElementById("map-tract-fill-select");
-    if (mapFillSel) {
-      mapFillSel.addEventListener("change", function () {
-        updateMapTractFillHint();
-        refreshChoroplethFromSelection();
-      });
-    }
-    updateMapTractFillHint();
+    updateMapToolbarContext();
 
     var basemapRoot = document.getElementById("basemap-toggle");
     if (basemapRoot) {
@@ -2847,21 +2898,11 @@
     syncLabel();
   }
 
-  mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
-
-  map = new mapboxgl.Map({
-    container: "map",
-    style: MAPBOX_STYLES.light,
-    center: DEFAULT_CENTER,
-    zoom: DEFAULT_ZOOM,
-    maxZoom: 19,
-  });
-
-  map.addControl(new mapboxgl.NavigationControl(), "top-left");
-  map.addControl(new mapboxgl.ScaleControl({ maxWidth: 120, unit: "imperial" }), "bottom-left");
-  map.addControl(new mapboxgl.AttributionControl({ compact: true }), "bottom-right");
-
-  map.on("load", function () {
+  /**
+   * Tracts + PLACES load from local /data files (not live CDC/Census APIs in the browser).
+   * Runs after the Mapbox style loads when a token is present; otherwise still runs so charts populate.
+   */
+  function runInitialDashboardLoad() {
     setLoading(
       true,
       "Loading census tract boundaries…",
@@ -2883,15 +2924,15 @@
           false
         );
         STATE.currentJoinedFc = blank;
-        addStudyExtentLayersBeforeTracts();
-        addTractLayers(blank);
-        addStudyExtentLayersAfterTracts();
-
-        var bb = bboxFromFc(STATE.tractBase);
-        if (bb) {
-          map.fitBounds(bb, { padding: 36, duration: 0, maxZoom: 10 });
+        if (map) {
+          addStudyExtentLayersBeforeTracts();
+          addTractLayers(blank);
+          addStudyExtentLayersAfterTracts();
+          var bb = bboxFromFc(STATE.tractBase);
+          if (bb) {
+            map.fitBounds(bb, { padding: 36, duration: 0, maxZoom: 10 });
+          }
         }
-
         setLoading(
           true,
           "Loading PLACES data…",
@@ -2941,5 +2982,31 @@
       .finally(function () {
         setLoading(false);
       });
-  });
+  }
+
+  if (MAPBOX_ACCESS_TOKEN) {
+    mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
+    map = new mapboxgl.Map({
+      container: "map",
+      style: MAPBOX_STYLES.light,
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM,
+      maxZoom: 19,
+    });
+    map.addControl(new mapboxgl.NavigationControl(), "top-left");
+    map.addControl(new mapboxgl.ScaleControl({ maxWidth: 120, unit: "imperial" }), "bottom-left");
+    map.addControl(new mapboxgl.AttributionControl({ compact: true }), "bottom-right");
+    map.on("load", function () {
+      runInitialDashboardLoad();
+    });
+  } else {
+    var mapMissingEl = document.getElementById("map");
+    if (mapMissingEl) {
+      mapMissingEl.innerHTML =
+        '<div style="padding:20px 22px;font:500 14px/1.55 system-ui,-apple-system,sans-serif;color:#0f172a;background:#f1f5f9;min-height:240px;box-sizing:border-box">' +
+        "<strong>No Mapbox token.</strong> Edit <code style=\"background:#e2e8f0;padding:1px 6px;border-radius:4px\">site-config.js</code> and set <code style=\"background:#e2e8f0;padding:1px 6px;border-radius:4px\">mapboxAccessToken</code> to your public token (<code style=\"background:#e2e8f0;padding:1px 6px;border-radius:4px\">pk.…</code>). " +
+        "PLACES and tract summaries below load from local files in <code style=\"background:#e2e8f0;padding:1px 6px;border-radius:4px\">/data</code> and should appear shortly.</div>";
+    }
+    runInitialDashboardLoad();
+  }
 })();
