@@ -1,0 +1,25 @@
+{
+  "type": "FeatureCollection",
+  "name": "saratoga-study-extent-placeholder",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Saratoga Springs, NY (approximate extent)",
+        "note": "Replace with official boundaries or census geometries when base data is available."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-73.82, 43.055],
+            [-73.745, 43.055],
+            [-73.745, 43.125],
+            [-73.82, 43.125],
+            [-73.82, 43.055]
+          ]
+        ]
+      }
+    }
+  ]
+}

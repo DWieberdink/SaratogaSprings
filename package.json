@@ -1,0 +1,19 @@
+{
+  "name": "saratoga-health-demographics-dashboard",
+  "private": true,
+  "description": "Local tooling to rebuild clipped tract GeoJSON from Census TIGERweb.",
+  "scripts": {
+    "ensure:acs-age": "node scripts/ensure-acs-age-data.js",
+    "dev": "npm run ensure:acs-age && npx --yes serve -l 5173 .",
+    "build:tracts": "node scripts/build-tracts-local.js",
+    "build:tracts:turf": "node scripts/build-clipped-tracts-turf.js",
+    "filter:places": "node scripts/filter-places-by-tracts.js",
+    "merge:places": "node scripts/merge-places-sources.js",
+    "build:places:study": "node scripts/merge-places-sources.js --tracts data/tracts_saratoga_50mi.geojson --out data/PLACES_saratoga_50mi.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2020_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2021_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2022_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2023_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2024_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data,_2025_release_20260511.geojson",
+    "report:places:drift": "node scripts/report-places-measure-drift.js",
+    "build:acs-age": "node scripts/fetch-acs-age-by-tract.js"
+  },
+  "dependencies": {
+    "@turf/turf": "^7.2.0"
+  }
+}

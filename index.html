@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Saratoga Springs, NY | Health Demographics Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Libre+Franklin:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="login-gate" class="login-gate">
+      <div class="login-gate__inner">
+        <h1 class="login-gate__title">
+          <span class="login-gate__title-line">Saratoga Springs, NY</span>
+          <span class="login-gate__title-line">Health Demographics Dashboard</span>
+        </h1>
+        <p class="login-gate__hint">Please enter the password to access this dashboard.</p>
+        <form id="login-form" class="login-gate__form" novalidate>
+          <label class="visually-hidden" for="login-password">Password</label>
+          <input
+            type="password"
+            id="login-password"
+            class="login-gate__input"
+            name="password"
+            placeholder="Enter password"
+            autocomplete="current-password"
+            required
+          />
+          <p id="login-error" class="login-gate__error" role="alert" hidden>
+            Incorrect password.
+          </p>
+          <button type="submit" class="login-gate__submit">Submit</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="loading-overlay" class="loading-overlay" hidden aria-live="polite">
+      <div class="loading-overlay__card">
+        <p class="loading-overlay__title" id="loading-overlay-title">Loading data…</p>
+        <p class="loading-overlay__detail" id="loading-overlay-detail"></p>
+      </div>
+    </div>
+
+    <div class="dashboard" id="dashboard" hidden>
+      <aside class="dashboard-sidebar" id="dashboard-sidebar" aria-label="Dashboard data">
+        <header class="sidebar-top-bar">
+          <div class="sidebar-top-bar__row sidebar-top-bar__row--heading">
+            <h1 class="sidebar-brand-line">
+              <span class="sidebar-brand-main"
+                >Saratoga Springs, NY | Health Demographics Dashboard</span
+              >
+            </h1>
+            <div class="sidebar-credits" aria-label="Developed by Perkins Eastman">
+              <span class="sidebar-credits__text">Developed by</span>
+              <img
+                class="sidebar-credits__logo sidebar-credits__logo--pe"
+                src="assets/perkins-eastman.png"
+                alt="Perkins Eastman"
+              />
+            </div>
+          </div>
+        </header>
+
+        <div class="dashboard-controls">
+          <div class="dashboard-controls-row">
+            <div class="dashboard-controls-field">
+              <label class="control-field-label" for="survey-year-select">BRFSS survey year</label>
+              <select
+                id="survey-year-select"
+                class="school-select school-select--year"
+                aria-label="BRFSS survey year for map and KPIs"
+                disabled
+              >
+                <option value="">—</option>
+              </select>
+            </div>
+            <div class="dashboard-controls-field dashboard-controls-field--grow">
+              <label class="control-field-label" for="metric-select">Health measure</label>
+              <select id="metric-select" class="school-select" aria-label="Select health measure">
+                <option value="">Select a measure…</option>
+              </select>
+              <p class="metric-helper" id="metric-helper" aria-live="polite"></p>
+            </div>
+          </div>
+          <p class="data-load-error" id="data-load-error" role="alert" hidden></p>
+        </div>
+
+        <section class="health-kpi-strip" aria-label="Key indicators">
+          <article class="kpi-card">
+            <h2 class="kpi-card__label">Adults in scope (sum)</h2>
+            <p class="kpi-card__value" id="kpi-population">—</p>
+          </article>
+          <article class="kpi-card">
+            <h2 class="kpi-card__label">Weighted mean prevalence</h2>
+            <p class="kpi-card__value" id="kpi-metric-value">—</p>
+          </article>
+          <article class="kpi-card">
+            <h2 class="kpi-card__label">Estimated Count of Adults Affected</h2>
+            <p class="kpi-card__value" id="kpi-estimated-count">—</p>
+          </article>
+        </section>
+
+        <section class="trends-block" aria-label="Study-area trends for selected measure">
+          <h2 class="trends-block__heading" id="trend-section-heading">Study-area trends (50 mi)</h2>
+          <p id="trend-insufficient-note" class="trend-insufficient-note" hidden></p>
+          <div class="trend-chart-cards">
+            <article class="trend-chart-card">
+              <h3 class="trend-chart__title">Weighted mean prevalence</h3>
+              <div class="trend-chart" id="chart-trend-pct" role="img" aria-label="Line chart of weighted mean prevalence over survey years"></div>
+            </article>
+            <article class="trend-chart-card">
+              <h3 class="trend-chart__title">Estimated adults affected (sum)</h3>
+              <div class="trend-chart" id="chart-trend-count" role="img" aria-label="Line chart of estimated affected adults over survey years"></div>
+            </article>
+          </div>
+        </section>
+
+        <section
+          class="aging-panel"
+          id="aging-panel"
+          aria-labelledby="aging-panel-heading"
+        >
+          <div class="aging-panel__top">
+            <div class="aging-panel__intro">
+              <h2 class="aging-panel__heading" id="aging-panel-heading">Population &amp; aging</h2>
+              <div class="aging-band-toggles-wrap aging-band-toggles-wrap--inline">
+                <label class="control-field-label" for="aging-band-trigger">Age groups</label>
+                <div class="aging-band-dropdown" id="aging-band-dropdown">
+                  <button
+                    type="button"
+                    class="aging-band-dropdown__trigger school-select"
+                    id="aging-band-trigger"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    aria-controls="aging-band-panel"
+                    disabled
+                  >
+                    <span class="aging-band-dropdown__summary" id="aging-band-summary">—</span>
+                    <span class="aging-band-dropdown__chevron" aria-hidden="true"></span>
+                  </button>
+                  <div
+                    class="aging-band-dropdown__panel"
+                    id="aging-band-panel"
+                    role="group"
+                    aria-label="Age group options"
+                    hidden
+                  >
+                    <div class="aging-band-dropdown__actions">
+                      <label class="visually-hidden" for="aging-band-bulk-select">Bulk age group selection</label>
+                      <select id="aging-band-bulk-select" class="school-select school-select--aging-bulk">
+                        <option value="">Bulk: select all / none…</option>
+                        <option value="__all__">Select all age groups</option>
+                        <option value="__none__">Select no age groups</option>
+                      </select>
+                    </div>
+                    <div class="aging-band-toggles" id="aging-band-toggles"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="aging-panel__field aging-panel__field--estimate">
+              <label class="aging-panel__label" for="acs-year-slider" id="acs-year-slider-label"
+                >ACS 5-Year Estimate</label
+              >
+              <div class="aging-acs-timeline">
+                <span class="aging-acs-timeline__tick" id="acs-year-slider-lo" aria-hidden="true"></span>
+                <input
+                  type="range"
+                  id="acs-year-slider"
+                  class="aging-acs-timeline__input"
+                  min="0"
+                  max="9"
+                  value="0"
+                  step="1"
+                  disabled
+                  aria-labelledby="acs-year-slider-label"
+                  aria-valuetext=""
+                />
+                <span class="aging-acs-timeline__tick" id="acs-year-slider-hi" aria-hidden="true"></span>
+              </div>
+              <div class="aging-acs-timeline__readout" id="acs-year-slider-readout" aria-live="polite">—</div>
+            </div>
+          </div>
+          <div class="aging-histogram-wrap">
+            <p id="aging-acs-coverage-note" class="aging-acs-coverage-note" role="status" hidden></p>
+            <h3 class="aging-histogram__title" id="aging-histogram-title">Age distribution (study radius)</h3>
+            <div class="aging-distribution" aria-label="Population by age group in the study area">
+              <div class="aging-table-head" role="row">
+                <span class="aging-table-head__cell aging-table-head__cell--label" role="columnheader">Age group</span>
+                <span class="aging-table-head__cell aging-table-head__cell--bar" role="columnheader">Distribution</span>
+                <span class="aging-table-head__cell aging-table-head__cell--count" role="columnheader"
+                  >Population <span class="aging-table-head__hint">(ACS groups)</span></span
+                >
+                <div class="aging-table-head__cell aging-table-head__cell--change" role="columnheader">
+                  <span class="aging-table-head__change-title">% change since</span>
+                  <select
+                    id="acs-baseline-year-select"
+                    class="school-select school-select--year school-select--baseline"
+                    aria-label="Older ACS 5-year estimate; must be before the selected estimate"
+                    disabled
+                  ></select>
+                </div>
+              </div>
+              <div
+                class="aging-histogram aging-table-body"
+                id="aging-histogram"
+                role="img"
+                aria-label="Histogram of population by age group"
+              ></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="trends-block trends-block--acs-pop" aria-label="ACS population by age group and year">
+          <h2 class="trends-block__heading" id="acs-pop-trend-heading">Population by age (ACS)</h2>
+          <div class="trend-chart-cards trend-chart-cards--single">
+            <article class="trend-chart-card">
+              <h3 class="trend-chart__title" id="acs-total-pop-chart-title">Population total (selected groups)</h3>
+              <div
+                class="trend-chart"
+                id="chart-acs-total-pop"
+                role="img"
+                aria-label="ACS end-year totals for selected age groups, with linear trend and short projection"
+              ></div>
+            </article>
+          </div>
+        </section>
+      </aside>
+
+      <button
+        type="button"
+        class="dashboard-resizer"
+        id="dashboard-resizer"
+        aria-label="Resize data panel"
+        title="Drag to resize"
+      ></button>
+
+      <div class="dashboard-map-wrap" id="dashboard-map-wrap">
+        <div id="map" class="map-root" role="application" aria-label="Map"></div>
+        <div class="toolbar" id="map-toolbar">
+          <button
+            type="button"
+            class="toolbar-toggle"
+            id="toolbar-toggle"
+            aria-expanded="true"
+            aria-controls="toolbar-panel"
+          >
+            <span>Map layers</span>
+            <span class="toolbar-toggle-chevron" aria-hidden="true"></span>
+          </button>
+          <div class="toolbar-panel" id="toolbar-panel">
+            <section class="layer-section layer-section--map-menu" aria-label="Map layers">
+              <div class="map-layers-menu-stack">
+                <div class="toggles choropleth-mode-toggles" role="group" aria-label="Choropleth value type">
+                  <label>
+                    <input type="checkbox" id="choropleth-percent" checked />
+                    <span class="toggle-label-stack">
+                      <span class="toggle-label-main">Percentage (rate)</span>
+                      <span class="toggle-label-sub">Crude prevalence from CDC Places data</span>
+                    </span>
+                  </label>
+                  <label>
+                    <input type="checkbox" id="choropleth-count" />
+                    <span class="toggle-label-stack">
+                      <span class="toggle-label-main">Estimated count</span>
+                      <span class="toggle-label-sub">Prevalence × adult population (18+)</span>
+                    </span>
+                  </label>
+                </div>
+                <div class="map-tract-fill-row">
+                  <label class="map-tract-fill-row__label" for="map-tract-fill-select">Tract fill</label>
+                  <select id="map-tract-fill-select" class="school-select school-select--map-fill" aria-label="What to show on the tract choropleth map">
+                    <option value="health">Health measure (sidebar)</option>
+                    <option value="acs:under_18">ACS age: Under 18</option>
+                    <option value="acs:g18_34">ACS age: 18–34</option>
+                    <option value="acs:g35_54">ACS age: 35–54</option>
+                    <option value="acs:g55_64">ACS age: 55–64</option>
+                    <option value="acs:g65_84">ACS age: 65–84</option>
+                    <option value="acs:g85_up">ACS age: 85+</option>
+                  </select>
+                  <p class="map-tract-fill-row__hint" id="map-tract-fill-hint" aria-live="polite"></p>
+                </div>
+                <div class="study-radius-row">
+                  <div class="study-radius-row__header">
+                    <span class="study-radius-row__label" id="study-radius-label">Study radius</span>
+                    <span class="study-radius-row__value" id="study-radius-value" aria-live="polite">50 mi</span>
+                  </div>
+                  <input
+                    type="range"
+                    id="study-radius-slider"
+                    min="1"
+                    max="50"
+                    step="1"
+                    value="50"
+                    aria-labelledby="study-radius-label"
+                    aria-valuemin="1"
+                    aria-valuemax="50"
+                  />
+                </div>
+                <div class="basemap-row basemap-row--embedded">
+                  <span class="basemap-label">Basemap</span>
+                  <div class="basemap-segmented basemap-segmented--triple" id="basemap-toggle" role="group" aria-label="Basemap style">
+                    <button type="button" data-basemap="light" class="is-active" aria-pressed="true">Light</button>
+                    <button type="button" data-basemap="streets" aria-pressed="false">Streets</button>
+                    <button type="button" data-basemap="satellite" aria-pressed="false">Satellite</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <aside class="map-density-legend" id="map-choropleth-legend" aria-label="Choropleth legend">
+          <div class="map-density-legend__title" id="map-choropleth-legend-title">Selected measure</div>
+          <div
+            class="map-density-legend__bar map-density-legend__bar--student"
+            id="map-choropleth-legend-bar"
+            role="img"
+            aria-label="Color scale"
+          ></div>
+          <div class="map-density-legend__axis">
+            <span class="map-density-legend__val" id="map-choropleth-legend-min">—</span>
+            <span class="map-density-legend__val" id="map-choropleth-legend-max">—</span>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js"></script>
+    <script src="site-config.js"></script>
+    <script>
+      (function () {
+        var AUTH_KEY = "saratogaHealthDashAuth";
+        var cfg = typeof window !== "undefined" && window.__SaratogaSiteConfig ? window.__SaratogaSiteConfig : {};
+        var PASSWORD =
+          cfg.dashboardPassword != null && String(cfg.dashboardPassword).length > 0
+            ? String(cfg.dashboardPassword)
+            : null;
+        var gate = document.getElementById("login-gate");
+        var dash = document.getElementById("dashboard");
+        var form = document.getElementById("login-form");
+        var err = document.getElementById("login-error");
+        var input = document.getElementById("login-password");
+
+        function loadApp() {
+          if (window.__saratogaDashLoaded) return;
+          window.__saratogaDashLoaded = true;
+          var t = document.createElement("script");
+          t.src = "https://cdn.jsdelivr.net/npm/@turf/turf@7.2.0/turf.min.js";
+          t.onload = function () {
+            var s = document.createElement("script");
+            s.src = "app.js";
+            document.body.appendChild(s);
+          };
+          t.onerror = function () {
+            console.error("Could not load Turf.js");
+            var s2 = document.createElement("script");
+            s2.src = "app.js";
+            document.body.appendChild(s2);
+          };
+          document.body.appendChild(t);
+        }
+
+        function enterDashboard() {
+          sessionStorage.setItem(AUTH_KEY, "1");
+          gate.hidden = true;
+          dash.hidden = false;
+          document.body.classList.add("dashboard-unlocked");
+          loadApp();
+        }
+
+        if (sessionStorage.getItem(AUTH_KEY) === "1") {
+          gate.hidden = true;
+          dash.hidden = false;
+          document.body.classList.add("dashboard-unlocked");
+          loadApp();
+        } else if (PASSWORD == null) {
+          enterDashboard();
+        } else if (form && input) {
+          form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            if (input.value === PASSWORD) {
+              err.hidden = true;
+              enterDashboard();
+            } else {
+              err.hidden = false;
+            }
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

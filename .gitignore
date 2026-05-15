@@ -1,0 +1,13 @@
+# Local Census Data API key (optional alternative to CENSUS_API_KEY)
+data/.census-api-key
+
+# Raw statewide PLACES extracts (often >100MB each — GitHub file limit). Rebuild study clip with:
+# npm run build:places:study (requires those sources locally).
+data/PLACES__Local_Data_for_Better_Health*.geojson
+
+node_modules/
+.DS_Store
+Thumbs.db
+
+# OneDrive / Office lock-style hidden file (may be unreadable to git)
+.849C9593-D756-4E56-8D6E-42412F2A707B
