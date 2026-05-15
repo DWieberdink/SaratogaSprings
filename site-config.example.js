@@ -1,6 +1,6 @@
 /**
- * Copy this file to site-config.js and fill in your values.
- * site-config.js is gitignored so tokens are not pushed to GitHub.
+ * Backup template — the live file is site-config.js (tracked, empty by default for GitHub Pages).
+ * Copy this over site-config.js if you need to reset, then add your Mapbox pk token locally.
  *
  * Public Mapbox token: https://account.mapbox.com/access-tokens/
  * Optional: set dashboardPassword to enable the login gate.
