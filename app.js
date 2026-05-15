@@ -1590,53 +1590,11 @@
     return collapseFineBinsToDisplay(fine);
   }
 
-  function countStudyTractsIndexed() {
-    return Object.keys(tractCentroidByGeoid).length;
-  }
-
-  function countAcsGeoidsCoveringStudy(data) {
-    if (!data || !data.features) return 0;
-    var seen = Object.create(null);
-    var rm = STATE.studyRadiusMiles;
-    var i;
-    for (i = 0; i < data.features.length; i++) {
-      var pr = data.features[i].properties || {};
-      var gid = normalizeGeoid(pr.GEOID != null ? pr.GEOID : pr.geoid);
-      if (!gid || !tractGeoidInStudyRadius(gid, rm)) continue;
-      seen[gid] = true;
-    }
-    return Object.keys(seen).length;
-  }
-
   function syncAcsAgeCoverageNote() {
     var el = document.getElementById("aging-acs-coverage-note");
     if (!el) return;
-    if (!STATE.acsAgeRaw) {
-      el.hidden = true;
-      el.textContent = "";
-      return;
-    }
-    var meta = STATE.acsAgeRaw.meta || {};
-    var tpl = countStudyTractsIndexed();
-    var acsN = countAcsGeoidsCoveringStudy(STATE.acsAgeRaw);
-    var desc = String(meta.description || "");
-    var sample =
-      meta.bundleKind === "sample" ||
-      /illustrative|small sample|replace with a real/i.test(desc);
-    var sparse =
-      tpl >= 50 && acsN < Math.max(30, Math.floor(tpl * 0.3));
-    if (!sample && !sparse) {
-      el.hidden = true;
-      el.textContent = "";
-      return;
-    }
-    el.textContent =
-      "Totals here only add census tracts that appear in data/acs_age_by_tract.json (" +
-      acsN +
-      " tracts with rows vs. " +
-      tpl +
-      " tracts on the map). The Census API requires a free key; with one, run npm run build:acs-age once to overwrite that file with B01001 for every study tract (full 50 mi counts). Put the key in CENSUS_API_KEY or data/.census-api-key. See data/README_TRACT_VINTAGE.md.";
-    el.hidden = false;
+    el.hidden = true;
+    el.textContent = "";
   }
 
   /** Human-readable label for ACS display group keys. */
