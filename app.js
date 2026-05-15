@@ -87,6 +87,45 @@
    */
   var TRACT_BOUNDARIES_GEOJSON = "data/tracts_saratoga_50mi.geojson";
 
+  /**
+   * Reference facilities (geocoded via OpenStreetMap Nominatim). Click markers on the map for notes.
+   */
+  var STUDY_FACILITIES_GEOJSON = {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        properties: {
+          id: "pace-hh",
+          name: "PACE at Hudson Headwaters",
+          address: "38 Larose St, Glens Falls, NY 12801",
+          note: "PACE is more likely senior day care center.",
+        },
+        geometry: { type: "Point", coordinates: [-73.6608151, 43.3068116] },
+      },
+      {
+        type: "Feature",
+        properties: {
+          id: "gfh",
+          name: "Glens Falls Hospital",
+          address: "100 Park St, Glens Falls, NY 12801",
+          note: "Glens Falls has no geriatric clinic.",
+        },
+        geometry: { type: "Point", coordinates: [-73.6460107, 43.3063845] },
+      },
+      {
+        type: "Feature",
+        properties: {
+          id: "amc",
+          name: "Albany Medical Center",
+          address: "43 New Scotland Ave, Albany, NY 12208",
+          note: "Albany has geriatric clinic but not comprehensive.",
+        },
+        geometry: { type: "Point", coordinates: [-73.7766789, 42.6532132] },
+      },
+    ],
+  };
+
   var DEFAULT_CENTER = [-73.7846, 43.0831];
   var DEFAULT_ZOOM = 11.2;
 
@@ -654,6 +693,98 @@
         /* ignore */
       }
     }
+  }
+
+  var studyFacilityClickFn = null;
+  var studyFacilityEnterFn = null;
+  var studyFacilityLeaveFn = null;
+
+  function removeStudyFacilitiesFromMap() {
+    if (!map) return;
+    if (studyFacilityClickFn) {
+      try {
+        map.off("click", "study-facility-circles", studyFacilityClickFn);
+        map.off("mouseenter", "study-facility-circles", studyFacilityEnterFn);
+        map.off("mouseleave", "study-facility-circles", studyFacilityLeaveFn);
+      } catch (eOff) {
+        /* ignore */
+      }
+      studyFacilityClickFn = null;
+      studyFacilityEnterFn = null;
+      studyFacilityLeaveFn = null;
+    }
+    try {
+      if (map.getLayer("study-facility-labels")) map.removeLayer("study-facility-labels");
+      if (map.getLayer("study-facility-circles")) map.removeLayer("study-facility-circles");
+      if (map.getSource("study-facilities")) map.removeSource("study-facilities");
+    } catch (eRm) {
+      /* ignore */
+    }
+  }
+
+  function addStudyFacilitiesToMap() {
+    if (!map) return;
+    removeStudyFacilitiesFromMap();
+    var fc = STUDY_FACILITIES_GEOJSON;
+    map.addSource("study-facilities", { type: "geojson", data: fc, promoteId: "id" });
+    map.addLayer({
+      id: "study-facility-circles",
+      type: "circle",
+      source: "study-facilities",
+      paint: {
+        "circle-radius": 8,
+        "circle-color": "#c2410c",
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#ffffff",
+      },
+    });
+    map.addLayer({
+      id: "study-facility-labels",
+      type: "symbol",
+      source: "study-facilities",
+      layout: {
+        "text-field": ["get", "name"],
+        "text-size": 11,
+        "text-offset": [0, 1.25],
+        "text-anchor": "top",
+        "text-max-width": 16,
+      },
+      paint: {
+        "text-color": "#0f172a",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1.5,
+      },
+    });
+    studyFacilityClickFn = function (e) {
+      var f = e.features && e.features[0];
+      if (!f || !f.properties) return;
+      var pr = f.properties;
+      var html =
+        '<div class="map-facility-popup">' +
+        '<div class="map-facility-popup__title">' +
+        escapeHtml(String(pr.name || "")) +
+        "</div>" +
+        '<div class="map-facility-popup__addr">' +
+        escapeHtml(String(pr.address || "")) +
+        "</div>" +
+        '<div class="map-facility-popup__note">' +
+        escapeHtml(String(pr.note || "")) +
+        "</div>" +
+        "</div>";
+      new mapboxgl.Popup({ maxWidth: "320px", closeButton: true, focusAfterOpen: false })
+        .setLngLat(e.lngLat)
+        .setHTML(html)
+        .addTo(map);
+    };
+    studyFacilityEnterFn = function () {
+      map.getCanvas().style.cursor = "pointer";
+    };
+    studyFacilityLeaveFn = function () {
+      map.getCanvas().style.cursor = "";
+    };
+    map.on("click", "study-facility-circles", studyFacilityClickFn);
+    map.on("mouseenter", "study-facility-circles", studyFacilityEnterFn);
+    map.on("mouseleave", "study-facility-circles", studyFacilityLeaveFn);
   }
 
   function rowYear(p) {
@@ -2292,6 +2423,47 @@
     return !!(c && c.checked);
   }
 
+  /** KPIs + PLACES trend charts from the sidebar measure, independent of map tract driver (ACS vs health). */
+  function refreshDiseaseMeasureSidebar() {
+    var sel = document.getElementById("metric-select");
+    var raw = sel && sel.value ? sel.value : "";
+    STATE.selectedMeasureKey = raw;
+    var parsed = parseMeasureKey(raw);
+    var helperEntry = raw ? getCatalogEntryForDisplay(raw, STATE.selectedSurveyYear) : null;
+    if (!parsed || !STATE.placesRaw) {
+      updateTrendCharts([]);
+      updateKpis(
+        {
+          sumPop: 0,
+          weightedMeanPct: null,
+          sumCountEst: null,
+          minYear: null,
+          maxYear: null,
+        },
+        null
+      );
+      var mh0 = document.getElementById("metric-helper");
+      if (mh0) mh0.textContent = "";
+      return;
+    }
+    var idx = buildPlacesIndexForMeasure(
+      STATE.placesRaw,
+      parsed.categoryId,
+      parsed.measureId,
+      STATE.selectedSurveyYear
+    );
+    var idxInRadius = filterIdxByRadius(idx, STATE.studyRadiusMiles);
+    var stats = computeStatsFromIndex(idxInRadius);
+    var ts = computeTimeSeriesForMeasure(
+      STATE.placesRaw,
+      parsed.categoryId,
+      parsed.measureId,
+      STATE.studyRadiusMiles
+    );
+    updateTrendCharts(ts);
+    updateKpis(stats, helperEntry);
+  }
+
   function setTractsLayerData(fc) {
     if (!map || !map.getSource || !map.getSource("tracts")) return;
     try {
@@ -2317,6 +2489,7 @@
         applyNeutralTractFillPaint();
         syncLegend(null, null, currentModeCount(), "ACS age data not loaded");
         refreshTractTooltipContent();
+        refreshDiseaseMeasureSidebar();
         return;
       }
       var y = STATE.selectedAcsYear;
@@ -2332,6 +2505,7 @@
         applyNeutralTractFillPaint();
         syncLegend(null, null, currentModeCount(), "Select ACS year in Population & aging");
         refreshTractTooltipContent();
+        refreshDiseaseMeasureSidebar();
         return;
       }
       var geoMap = buildGeoidAcsDisplayMap(y);
@@ -2357,6 +2531,10 @@
         syncLegend(null, null, modeCount, legendTitle);
       }
       refreshTractTooltipContent();
+      refreshDiseaseMeasureSidebar();
+      if (STATE.acsAgeRaw) {
+        refreshAcsAgingDependentCharts();
+      }
       return;
     }
 
@@ -2867,6 +3045,7 @@
       }
       addStudyExtentLayersAfterTracts();
       refreshChoroplethFromSelection();
+      addStudyFacilitiesToMap();
     });
     map.setStyle(MAPBOX_STYLES[mode]);
   }
@@ -2966,6 +3145,7 @@
           addStudyExtentLayersBeforeTracts();
           addTractLayers(blank);
           addStudyExtentLayersAfterTracts();
+          addStudyFacilitiesToMap();
           var bb = bboxFromFc(STATE.tractBase);
           if (bb) {
             map.fitBounds(bb, { padding: 36, duration: 0, maxZoom: 10 });

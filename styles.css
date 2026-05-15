@@ -1356,6 +1356,34 @@ body.dashboard-unlocked {
   color: #4b5563;
 }
 
+.map-facility-popup {
+  padding: 4px 2px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #1f2937;
+}
+
+.map-facility-popup__title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  color: #0f172a;
+}
+
+.map-facility-popup__addr {
+  color: #475569;
+  margin-bottom: 8px;
+  font-size: 0.82rem;
+}
+
+.map-facility-popup__note {
+  font-size: 0.85rem;
+  color: #334155;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+  margin-top: 2px;
+}
+
 @media (max-width: 960px) {
   .dashboard {
     flex-direction: column;
