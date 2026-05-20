@@ -326,8 +326,8 @@
     }
     return { type: "FeatureCollection", features: out };
   }
-  /** Headroom above the largest selected age group so the top bar is not quite 100% wide. */
-  var ACS_DIST_BAR_SCALE_PAD = 5000;
+  /** Fixed distribution bar scale (same for every ACS year so bars are comparable across time). */
+  var ACS_DIST_BAR_SCALE_MAX = 320000;
 
   /** Preferred short_question_text for selected measures (manual editorial choice). */
   var CANONICAL_SHORT_BY_KEY = {
@@ -1823,13 +1823,7 @@
         '<p class="trend-chart-empty">Select at least one age group to show the distribution and totals below.</p>';
       return;
     }
-    var barScaleMax = 0;
-    var j;
-    for (j = 0; j < enabledOrder.length; j++) {
-      var vMax = Number(agg[enabledOrder[j]] || 0);
-      if (isFinite(vMax)) barScaleMax = Math.max(barScaleMax, vMax);
-    }
-    barScaleMax = Math.max(barScaleMax, 1) + ACS_DIST_BAR_SCALE_PAD;
+    var barScaleMax = ACS_DIST_BAR_SCALE_MAX;
     var sumC = sumBinsFromAggForEnabled(agg, enabledOrder);
     var sumB = aggBase ? sumBinsFromAggForEnabled(aggBase, enabledOrder) : NaN;
     var html = '<div class="aging-bars">';
