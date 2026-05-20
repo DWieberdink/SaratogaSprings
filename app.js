@@ -326,8 +326,6 @@
     }
     return { type: "FeatureCollection", features: out };
   }
-  var ACS_DIST_BAR_SCALE_MAX = 100000;
-
   /** Preferred short_question_text for selected measures (manual editorial choice). */
   var CANONICAL_SHORT_BY_KEY = {
     "HLTHOUT|CANCER": "Cancer (non-skin) or Melanoma",
@@ -1829,7 +1827,6 @@
       if (isFinite(vMax)) barScaleMax = Math.max(barScaleMax, vMax);
     }
     barScaleMax = Math.max(barScaleMax, 1);
-    barScaleMax = Math.min(barScaleMax, ACS_DIST_BAR_SCALE_MAX);
     var sumC = sumBinsFromAggForEnabled(agg, enabledOrder);
     var sumB = aggBase ? sumBinsFromAggForEnabled(aggBase, enabledOrder) : NaN;
     var html = '<div class="aging-bars">';
