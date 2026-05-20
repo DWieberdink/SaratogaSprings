@@ -132,6 +132,25 @@
   var DEFAULT_CENTER = [-73.7846, 43.0831];
   var DEFAULT_ZOOM = 11.2;
 
+  /**
+   * Earliest year shown in the UI (ACS slider, BRFSS survey year, trend charts, % change baselines).
+   * Older rows remain in bundled GeoJSON; they are not used in the dashboard (avoids 2019→2020 tract vintage jump).
+   */
+  var MIN_DASHBOARD_YEAR = 2020;
+
+  function yearInDashboardRange(y) {
+    return isFinite(Number(y)) && Number(y) >= MIN_DASHBOARD_YEAR;
+  }
+
+  /** @param {number[]} years */
+  function filterDashboardYears(years) {
+    return (years || [])
+      .filter(yearInDashboardRange)
+      .sort(function (a, b) {
+        return a - b;
+      });
+  }
+
   var COLOR_RAMPS = {
     low: "#eff6ff",
     high: "#1e40af",
@@ -928,17 +947,15 @@
       var mid = String(prop(p, ["measureid", "MeasureId"]) || "").trim();
       if (!cid || !mid) continue;
       var yr = rowYear(p);
-      if (!isFinite(yr) || yr === -Infinity) continue;
+      if (!isFinite(yr) || yr === -Infinity || !yearInDashboardRange(yr)) continue;
       yearMap[yr] = true;
       var key = cid + "|" + mid;
       if (!matrix[key]) matrix[key] = Object.create(null);
       matrix[key][yr] = true;
     }
-    var surveyYears = Object.keys(yearMap)
-      .map(Number)
-      .sort(function (a, b) {
-        return b - a;
-      });
+    var surveyYears = filterDashboardYears(Object.keys(yearMap).map(Number)).sort(function (a, b) {
+      return b - a;
+    });
     var measureYearMatrix = Object.create(null);
     var k;
     for (k in matrix) {
@@ -970,9 +987,9 @@
       var mid = String(prop(p, ["measureid", "MeasureId"]) || "").trim();
       if (cid !== cat || mid !== meas) continue;
       var yr = rowYear(p);
-      if (isFinite(yr) && yr !== -Infinity) ys[yr] = true;
+      if (isFinite(yr) && yr !== -Infinity && yearInDashboardRange(yr)) ys[yr] = true;
     }
-    return Object.keys(ys).map(Number);
+    return filterDashboardYears(Object.keys(ys).map(Number));
   }
 
   function getYearsForMeasureKey(key) {
@@ -981,7 +998,7 @@
       STATE.placesManifest.measureYearMatrix &&
       STATE.placesManifest.measureYearMatrix[key]
     ) {
-      return STATE.placesManifest.measureYearMatrix[key].slice();
+      return filterDashboardYears(STATE.placesManifest.measureYearMatrix[key].slice());
     }
     return deriveYearsForMeasureFromFeatures(key);
   }
@@ -1387,11 +1404,7 @@
       var y = pr.year != null ? Number(pr.year) : NaN;
       if (isFinite(y)) yi[y] = true;
     }
-    return Object.keys(yi)
-      .map(Number)
-      .sort(function (a, b) {
-        return a - b;
-      });
+    return filterDashboardYears(Object.keys(yi).map(Number));
   }
 
   function ensureAcsBinEnabledDefaults() {
@@ -2276,11 +2289,11 @@
   function populateSurveyYearsDropdown() {
     var sel = document.getElementById("survey-year-select");
     if (!sel) return;
-    var years =
+    var years = filterDashboardYears(
       STATE.placesManifest && STATE.placesManifest.surveyYears
         ? STATE.placesManifest.surveyYears.slice()
-        : [];
-    years.sort(function (a, b) {
+        : []
+    ).sort(function (a, b) {
       return b - a;
     });
     sel.innerHTML = "";

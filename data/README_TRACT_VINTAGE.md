@@ -44,6 +44,10 @@ By default the script requests ACS 5-year **end-years** 2015–2024, probes each
 
 The script reads every tract `GEOID` in the tract GeoJSON, derives unique `(state, county)` pairs, queries ACS 5-year **B01001** estimates per county (`for=tract:*&in=state:…&in=county:…`), keeps only tracts in the study file, and writes `ageBins` (combined), `ageBinsMale`, and `ageBinsFemale` for **ages 18+** through **85+** using `scripts/b01001-tract-bin-map.js` (under-18 rows are omitted). Margins of error are not included; Census suppression appears as zero in bin sums.
 
+## Dashboard year range (UI only)
+
+The live dashboard uses **`MIN_DASHBOARD_YEAR = 2020`** in `app.js` for ACS end-years, BRFSS survey years, trend charts, and %‑change baselines. Older years may still exist in `acs_age_by_tract.json` and PLACES files; they are not deleted—only hidden from the UI to avoid comparing pre‑2020 ACS tract coverage with 2020+ geography.
+
 ## Loading strategy
 
 - **Bundled multi-year PLACES**: `merge-places-sources.js` concatenates releases, then filters with `--tracts` (same pattern as `filter-places-by-tracts.js`). The app reads `places_manifest.json` for year coverage and keeps **one** tract GeoJSON so geometry is not duplicated per year.
