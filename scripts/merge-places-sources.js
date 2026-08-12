@@ -21,17 +21,70 @@ function parseArgs(argv) {
   var sources = [];
   var out = null;
   var tracts = null;
+  var manifest = null;
+  var slim = false;
+  var minYear = null;
   var i;
   for (i = 2; i < argv.length; i++) {
     if (argv[i] === "--out" && argv[i + 1]) {
       out = path.resolve(argv[++i]);
     } else if (argv[i] === "--tracts" && argv[i + 1]) {
       tracts = path.resolve(argv[++i]);
+    } else if (argv[i] === "--manifest" && argv[i + 1]) {
+      manifest = path.resolve(argv[++i]);
+    } else if (argv[i] === "--slim") {
+      slim = true;
+    } else if (argv[i] === "--min-year" && argv[i + 1]) {
+      minYear = parseInt(argv[++i], 10);
     } else if (!argv[i].startsWith("--")) {
       sources.push(path.resolve(argv[i]));
     }
   }
-  return { sources, out, tracts };
+  return {
+    sources: sources,
+    out: out,
+    tracts: tracts,
+    manifest: manifest,
+    slim: slim,
+    minYear: minYear,
+  };
+}
+
+var SLIM_PROP_KEYS = [
+  "year",
+  "Year",
+  "stateabbr",
+  "StateAbbr",
+  "category",
+  "Category",
+  "measure",
+  "Measure",
+  "data_value",
+  "Data_Value",
+  "totalpopulation",
+  "TotalPopulation",
+  "totalpop18plus",
+  "TotalPop18plus",
+  "locationname",
+  "LocationName",
+  "locationid",
+  "LocationId",
+  "categoryid",
+  "CategoryId",
+  "measureid",
+  "MeasureId",
+  "short_question_text",
+  "Short_Question_Text",
+];
+
+function slimProperties(props) {
+  var np = {};
+  var i;
+  for (i = 0; i < SLIM_PROP_KEYS.length; i++) {
+    var k = SLIM_PROP_KEYS[i];
+    if (props[k] != null && props[k] !== "") np[k] = props[k];
+  }
+  return np;
 }
 
 function loadGeoidSet(tractFc) {
@@ -88,9 +141,17 @@ function main() {
         continue;
       }
       var normalizedProps = normalizeTractLocationProps(feats[fi].properties, gid);
+      if (args.minYear != null && isFinite(args.minYear)) {
+        var yr = parseInt(normalizedProps.year != null ? normalizedProps.year : normalizedProps.Year, 10);
+        if (!isFinite(yr) || yr < args.minYear) {
+          skipped++;
+          continue;
+        }
+      }
+      if (args.slim) normalizedProps = slimProperties(normalizedProps);
       merged.push({
         type: "Feature",
-        geometry: feats[fi].geometry,
+        geometry: args.slim ? null : feats[fi].geometry,
         properties: normalizedProps,
       });
       keptThisFile++;
@@ -114,7 +175,9 @@ function main() {
   fs.writeFileSync(args.out, JSON.stringify(outFc), "utf8");
   console.log("Wrote", path.relative(process.cwd(), args.out), "(" + merged.length + " features)");
 
-  writePlacesManifest(outFc, path.join(path.dirname(args.out), "places_manifest.json"));
+  var manifestPath =
+    args.manifest || path.join(path.dirname(args.out), "places_manifest.json");
+  writePlacesManifest(outFc, manifestPath);
 }
 
 main();

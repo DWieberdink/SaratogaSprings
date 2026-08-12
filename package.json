@@ -6,12 +6,15 @@
     "ensure:acs-age": "node scripts/ensure-acs-age-data.js",
     "dev": "npm run ensure:acs-age && npx --yes serve -l 5173 .",
     "build:tracts": "node scripts/build-tracts-local.js",
+    "build:tracts:nyc": "node scripts/build-tracts-local.js --center -73.9903,40.7359 --radius 10 --states 36,34 --label \"Union Square, NYC\" --out data/tracts_union_square_10mi.geojson",
     "build:tracts:turf": "node scripts/build-clipped-tracts-turf.js",
     "filter:places": "node scripts/filter-places-by-tracts.js",
     "merge:places": "node scripts/merge-places-sources.js",
-    "build:places:study": "node scripts/merge-places-sources.js --tracts data/tracts_saratoga_50mi.geojson --out data/PLACES_saratoga_50mi.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2020_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2021_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2022_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2023_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2024_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data,_2025_release_20260511.geojson",
-    "report:places:drift": "node scripts/report-places-measure-drift.js",
-    "build:acs-age": "node scripts/fetch-acs-age-by-tract.js"
+    "build:places:study": "node scripts/merge-places-sources.js --tracts data/tracts_saratoga_50mi.geojson --out data/PLACES_saratoga_50mi.geojson --manifest data/places_manifest.json data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2020_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2021_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2022_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2023_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2024_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data,_2025_release_20260511.geojson",
+    "build:places:nyc": "node scripts/merge-places-sources.js --slim --min-year 2020 --tracts data/tracts_union_square_10mi.geojson --out data/PLACES_union_square_10mi.geojson --manifest data/places_manifest_union_square.json data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2020_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2021_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2022_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2023_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data_2024_release_20260511.geojson data/PLACES__Local_Data_for_Better_Health,_Census_Tract_Data,_2025_release_20260511.geojson && node -e \"require('fs').writeFileSync('data/PLACES_union_square_10mi.geojson.gz',require('zlib').gzipSync(require('fs').readFileSync('data/PLACES_union_square_10mi.geojson'),{level:9})); console.log('Wrote data/PLACES_union_square_10mi.geojson.gz');\"",
+    "build:acs-age": "node scripts/fetch-acs-age-by-tract.js",
+    "build:acs-age:nyc": "node scripts/fetch-acs-age-by-tract.js --tracts data/tracts_union_square_10mi.geojson --out data/acs_age_by_tract_union_square.json",
+    "report:places:drift": "node scripts/report-places-measure-drift.js"
   },
   "dependencies": {
     "@turf/turf": "^7.2.0"

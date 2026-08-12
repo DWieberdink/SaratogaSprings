@@ -1,9 +1,15 @@
+# Local site secrets (Mapbox pk token, optional dashboard password) — copy from site-config.example.js
+# (site-config.js is tracked with empty placeholders for Pages)
+
 # Local Census Data API key (optional alternative to CENSUS_API_KEY)
 data/.census-api-key
 
 # Raw statewide PLACES extracts (often >100MB each — GitHub file limit). Rebuild study clip with:
 # npm run build:places:study (requires those sources locally).
 data/PLACES__Local_Data_for_Better_Health*.geojson
+
+# Uncompressed NYC PLACES clip (~90MB+); commit the .gz instead (npm run build:places:nyc then gzip).
+data/PLACES_union_square_10mi.geojson
 
 node_modules/
 .DS_Store

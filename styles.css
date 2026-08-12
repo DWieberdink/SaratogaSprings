@@ -224,6 +224,38 @@ body.dashboard-unlocked {
   justify-content: space-between;
 }
 
+.site-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.site-tabs__btn {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #374151;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.site-tabs__btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.site-tabs__btn.is-active {
+  background: #1e40af;
+  border-color: #1e40af;
+  color: #fff;
+}
+
 .sidebar-credits {
   display: flex;
   flex-wrap: wrap;

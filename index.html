@@ -72,6 +72,29 @@
               />
             </div>
           </div>
+          <div
+            class="site-tabs"
+            id="site-tabs"
+            role="group"
+            aria-label="Study area"
+          >
+            <button
+              type="button"
+              class="site-tabs__btn is-active"
+              data-site-id="saratoga"
+              aria-pressed="true"
+            >
+              Saratoga Springs
+            </button>
+            <button
+              type="button"
+              class="site-tabs__btn"
+              data-site-id="nyc"
+              aria-pressed="false"
+            >
+              NYC · Union Square
+            </button>
+          </div>
         </header>
 
         <div class="dashboard-controls">
@@ -376,13 +399,13 @@
           t.src = "https://cdn.jsdelivr.net/npm/@turf/turf@7.2.0/turf.min.js";
           t.onload = function () {
             var s = document.createElement("script");
-            s.src = "app.js?v=9";
+            s.src = "app.js?v=11";
             document.body.appendChild(s);
           };
           t.onerror = function () {
             console.error("Could not load Turf.js");
             var s2 = document.createElement("script");
-            s2.src = "app.js?v=9";
+            s2.src = "app.js?v=11";
             document.body.appendChild(s2);
           };
           document.body.appendChild(t);

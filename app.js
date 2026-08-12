@@ -63,34 +63,13 @@
   };
 
   /**
-   * PLACES rows filtered to the same GEOIDs as data/tracts_saratoga_50mi.geojson (50 mi study area).
-   * Regenerate after tract build or new PLACES release: npm run build:places:study (multi-release) or npm run filter:places (single source).
-   */
-  var PLACES_GEOJSON = "data/PLACES_saratoga_50mi.geojson";
-
-  /** Built by merge/filter scripts — survey years + measure×year matrix (see places_manifest.json) */
-  var PLACES_MANIFEST_URL = "data/places_manifest.json";
-
-  /** Optional tract-level age bins (ACS B01001); loaded when the dashboard finishes wiring UI */
-  var ACS_AGE_GEOJSON_URL = "data/acs_age_by_tract.json";
-
-  /**
-   * CDC PLACES product release year (tooltips / documentation; update when replacing the GeoJSON extract).
-   * Row-level `year` in the file may still reflect BRFSS survey years (often one year behind the release).
+   * PLACES / tracts / ACS paths and map geography are per site (see SITES below).
+   * CDC PLACES product release year (tooltips / documentation).
    */
   var PLACES_RELEASE_YEAR = 2025;
 
-  /**
-   * Census tract polygons for the map — built offline from TIGERweb; includes tracts whose centroid lies
-   * within a 50 mi great-circle radius of Saratoga Springs. Regenerate with:
-   * node scripts/build-tracts-local.js (or npm run build:tracts:turf for polygon intersection clipping).
-   */
-  var TRACT_BOUNDARIES_GEOJSON = "data/tracts_saratoga_50mi.geojson";
-
-  /**
-   * Reference facilities (geocoded via OpenStreetMap Nominatim). Click markers on the map for notes.
-   */
-  var STUDY_FACILITIES_GEOJSON = {
+  /** Saratoga facility markers (empty FeatureCollection for NYC until sites are added). */
+  var SARATOGA_FACILITIES_GEOJSON = {
     type: "FeatureCollection",
     features: [
       {
@@ -129,8 +108,61 @@
     ],
   };
 
-  var DEFAULT_CENTER = [-73.7846, 43.0831];
-  var DEFAULT_ZOOM = 11.2;
+  var SITES = {
+    saratoga: {
+      id: "saratoga",
+      label: "Saratoga Springs",
+      brandTitle: "Saratoga Springs, NY | Health Demographics Dashboard",
+      center: [-73.7846, 43.0831],
+      defaultZoom: 11.2,
+      radiusMax: 50,
+      radiusDefault: 50,
+      tracts: "data/tracts_saratoga_50mi.geojson",
+      places: "data/PLACES_saratoga_50mi.geojson",
+      placesManifest: "data/places_manifest.json",
+      acsAge: "data/acs_age_by_tract.json",
+      facilities: SARATOGA_FACILITIES_GEOJSON,
+      centerLabel: "Saratoga Springs, NY",
+      acsDistBarScaleMax: 320000,
+    },
+    nyc: {
+      id: "nyc",
+      label: "NYC · Union Square",
+      brandTitle: "NYC · Union Square | Health Demographics Dashboard",
+      center: [-73.9903, 40.7359],
+      defaultZoom: 11.5,
+      radiusMax: 10,
+      radiusDefault: 10,
+      tracts: "data/tracts_union_square_10mi.geojson",
+      places: "data/PLACES_union_square_10mi.geojson.gz",
+      placesManifest: "data/places_manifest_union_square.json",
+      acsAge: "data/acs_age_by_tract_union_square.json",
+      facilities: { type: "FeatureCollection", features: [] },
+      centerLabel: "Union Square, NYC",
+      acsDistBarScaleMax: 2500000,
+    },
+  };
+
+  var activeSiteId = "saratoga";
+
+  function activeSite() {
+    return SITES[activeSiteId] || SITES.saratoga;
+  }
+
+  function siteCenter() {
+    return activeSite().center;
+  }
+
+  function siteRadiusMax() {
+    return Number(activeSite().radiusMax) || 50;
+  }
+
+  function clampStudyRadius(v) {
+    var maxR = siteRadiusMax();
+    var n = Number(v);
+    if (!isFinite(n)) n = activeSite().radiusDefault;
+    return Math.max(1, Math.min(maxR, n));
+  }
 
   /**
    * Earliest year shown in the UI (ACS slider, BRFSS survey year, trend charts, % change baselines).
@@ -326,8 +358,7 @@
     }
     return { type: "FeatureCollection", features: out };
   }
-  /** Fixed distribution bar scale (same for every ACS year so bars are comparable across time). */
-  var ACS_DIST_BAR_SCALE_MAX = 320000;
+  /** Distribution bar scale comes from activeSite().acsDistBarScaleMax */
 
   /** Preferred short_question_text for selected measures (manual editorial choice). */
   var CANONICAL_SHORT_BY_KEY = {
@@ -422,11 +453,22 @@
 
   function fetchGeoJsonOk(url) {
     var u = resolveAssetUrl(url);
+    var isGz = /\.gz(\?|$)/i.test(String(url)) || /\.gz(\?|$)/i.test(u);
     return fetch(u).then(function (r) {
       if (!r.ok) {
         throw new Error("Could not load " + u + " (" + r.status + " " + r.statusText + ")");
       }
-      return r.json();
+      if (!isGz) return r.json();
+      if (typeof DecompressionStream === "undefined") {
+        throw new Error(
+          "This browser cannot decompress .gz data files (needs DecompressionStream). Use a current Chrome/Edge/Firefox, or expand the GeoJSON locally."
+        );
+      }
+      var ds = new DecompressionStream("gzip");
+      var stream = r.body.pipeThrough(ds);
+      return new Response(stream).text().then(function (text) {
+        return JSON.parse(text);
+      });
     });
   }
 
@@ -597,7 +639,7 @@
         ? Number(radiusMiles)
         : STATE.studyRadiusMiles;
     try {
-      var d = turf.distance(turf.point(DEFAULT_CENTER), turf.point(ll), { units: "miles" });
+      var d = turf.distance(turf.point(siteCenter()), turf.point(ll), { units: "miles" });
       return d <= rm + 1e-9;
     } catch (eD) {
       return false;
@@ -636,8 +678,8 @@
   /** Grey mask outside study radius + stash circle for ring / mask rebuild after style changes */
   function addStudyExtentLayersBeforeTracts() {
     if (!map || typeof turf === "undefined" || !turf.circle) return;
-    var pt = turf.point(DEFAULT_CENTER);
-    var rMi = Math.max(1, Math.min(50, Number(STATE.studyRadiusMiles) || 50));
+    var pt = turf.point(siteCenter());
+    var rMi = clampStudyRadius(STATE.studyRadiusMiles);
     var circleFeat = turf.circle(pt, rMi, { units: "miles", steps: 96 });
     STATE.studyCircleFeat = circleFeat;
     var maskFeat = buildStudyAreaMaskPolygon(circleFeat);
@@ -662,7 +704,7 @@
     }
   }
 
-  /** 50 mi boundary line + Saratoga Springs point — drawn above tract fills */
+  /** Study-area boundary line + site center point — drawn above tract fills */
   function addStudyExtentLayersAfterTracts() {
     if (!map || !STATE.studyCircleFeat) return;
     var lineData = circleToLineStringFc(STATE.studyCircleFeat);
@@ -671,8 +713,8 @@
       features: [
         {
           type: "Feature",
-          properties: { name: "Saratoga Springs, NY" },
-          geometry: { type: "Point", coordinates: DEFAULT_CENTER },
+          properties: { name: activeSite().centerLabel },
+          geometry: { type: "Point", coordinates: siteCenter() },
         },
       ],
     };
@@ -748,7 +790,7 @@
   function addStudyFacilitiesToMap() {
     if (!map) return;
     removeStudyFacilitiesFromMap();
-    var fc = STUDY_FACILITIES_GEOJSON;
+    var fc = activeSite().facilities || { type: "FeatureCollection", features: [] };
     map.addSource("study-facilities", { type: "geojson", data: fc, promoteId: "id" });
     map.addLayer({
       id: "study-facility-circles",
@@ -1035,14 +1077,14 @@
   function updateTrendSectionHeading() {
     var el = document.getElementById("trend-section-heading");
     if (!el) return;
-    var r = Math.max(1, Math.min(50, Number(STATE.studyRadiusMiles) || 50));
+    var r = clampStudyRadius(STATE.studyRadiusMiles);
     el.textContent = "Study-area trends (" + r + " mi)";
   }
 
   function updateAcsPopTrendHeading() {
     var el = document.getElementById("acs-pop-trend-heading");
     if (!el) return;
-    var r = Math.max(1, Math.min(50, Number(STATE.studyRadiusMiles) || 50));
+    var r = clampStudyRadius(STATE.studyRadiusMiles);
     el.textContent = "Population by age (ACS) (" + r + " mi)";
   }
 
@@ -1823,7 +1865,7 @@
         '<p class="trend-chart-empty">Select at least one age group to show the distribution and totals below.</p>';
       return;
     }
-    var barScaleMax = ACS_DIST_BAR_SCALE_MAX;
+    var barScaleMax = Number(activeSite().acsDistBarScaleMax) || 320000;
     var sumC = sumBinsFromAggForEnabled(agg, enabledOrder);
     var sumB = aggBase ? sumBinsFromAggForEnabled(aggBase, enabledOrder) : NaN;
     var html = '<div class="aging-bars">';
@@ -1878,7 +1920,7 @@
 
   function refreshAgingVisualization() {
     syncAcsAgeCoverageNote();
-    var r = Math.max(1, Math.min(50, Number(STATE.studyRadiusMiles) || 50));
+    var r = clampStudyRadius(STATE.studyRadiusMiles);
     var titleEl = document.getElementById("aging-histogram-title");
     if (titleEl) {
       titleEl.textContent = "Age distribution (" + r + " mi)";
@@ -1891,7 +1933,7 @@
   function tryFetchAcsAge() {
     if (STATE.acsAgeFetched || STATE.acsAgeFetchInFlight) return;
     STATE.acsAgeFetchInFlight = true;
-    fetch(resolveAssetUrl(ACS_AGE_GEOJSON_URL))
+    fetch(resolveAssetUrl(activeSite().acsAge))
       .then(function (r) {
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
@@ -3055,44 +3097,49 @@
   }
 
   function wireUiAfterData() {
-    setupToolbarCollapse();
-    initDashboardResizer();
-    wireChoroplethModeCheckboxes();
+    wireSiteTabs();
+    updateSiteBrandUi();
+    if (!wireUiAfterData._wired) {
+      wireUiAfterData._wired = true;
+      setupToolbarCollapse();
+      initDashboardResizer();
+      wireChoroplethModeCheckboxes();
+
+      var basemapRoot = document.getElementById("basemap-toggle");
+      if (basemapRoot) {
+        basemapRoot.addEventListener("click", function (e) {
+          var t = e.target;
+          if (t && t.getAttribute && t.getAttribute("data-basemap")) {
+            setMapboxBasemap(t.getAttribute("data-basemap"));
+          }
+        });
+      }
+
+      var sel = document.getElementById("metric-select");
+      if (sel) {
+        sel.addEventListener("change", refreshChoroplethFromSelection);
+      }
+
+      var sy = document.getElementById("survey-year-select");
+      if (sy) {
+        sy.addEventListener("change", function () {
+          var v = parseInt(sy.value, 10);
+          STATE.selectedSurveyYear = isFinite(v) ? v : null;
+          populateMetricDropdown();
+          var ms = document.getElementById("metric-select");
+          if (ms && ms.value && STATE.selectedSurveyYear != null) {
+            var ok =
+              keysAvailableForYear(STATE.selectedSurveyYear).indexOf(ms.value) >= 0;
+            if (!ok) ms.value = "";
+          }
+          refreshChoroplethFromSelection();
+        });
+      }
+
+      wireAgingPanel();
+    }
 
     updateMapToolbarContext();
-
-    var basemapRoot = document.getElementById("basemap-toggle");
-    if (basemapRoot) {
-      basemapRoot.addEventListener("click", function (e) {
-        var t = e.target;
-        if (t && t.getAttribute && t.getAttribute("data-basemap")) {
-          setMapboxBasemap(t.getAttribute("data-basemap"));
-        }
-      });
-    }
-
-    var sel = document.getElementById("metric-select");
-    if (sel) {
-      sel.addEventListener("change", refreshChoroplethFromSelection);
-    }
-
-    var sy = document.getElementById("survey-year-select");
-    if (sy) {
-      sy.addEventListener("change", function () {
-        var v = parseInt(sy.value, 10);
-        STATE.selectedSurveyYear = isFinite(v) ? v : null;
-        populateMetricDropdown();
-        var ms = document.getElementById("metric-select");
-        if (ms && ms.value && STATE.selectedSurveyYear != null) {
-          var ok =
-            keysAvailableForYear(STATE.selectedSurveyYear).indexOf(ms.value) >= 0;
-          if (!ok) ms.value = "";
-        }
-        refreshChoroplethFromSelection();
-      });
-    }
-
-    wireAgingPanel();
     wireStudyRadiusSlider();
     tryFetchAcsAge();
   }
@@ -3101,22 +3148,127 @@
     var sl = document.getElementById("study-radius-slider");
     var out = document.getElementById("study-radius-value");
     if (!sl) return;
-    sl.value = String(Math.max(1, Math.min(50, Number(STATE.studyRadiusMiles) || 50)));
+    var maxR = siteRadiusMax();
+    sl.max = String(maxR);
+    sl.setAttribute("aria-valuemax", String(maxR));
+    sl.value = String(clampStudyRadius(STATE.studyRadiusMiles));
     function syncLabel() {
       if (out) out.textContent = sl.value + " mi";
       sl.setAttribute("aria-valuenow", sl.value);
       updateTrendSectionHeading();
       updateAcsPopTrendHeading();
     }
-    sl.addEventListener("input", function () {
-      var v = parseInt(sl.value, 10);
-      if (!isFinite(v)) return;
-      STATE.studyRadiusMiles = Math.max(1, Math.min(50, v));
-      syncLabel();
-      refreshStudyExtentGeometry();
-      refreshChoroplethFromSelection();
-    });
+    if (!wireStudyRadiusSlider._wired) {
+      wireStudyRadiusSlider._wired = true;
+      sl.addEventListener("input", function () {
+        var v = parseInt(sl.value, 10);
+        if (!isFinite(v)) return;
+        STATE.studyRadiusMiles = clampStudyRadius(v);
+        syncLabel();
+        refreshStudyExtentGeometry();
+        refreshChoroplethFromSelection();
+      });
+    }
     syncLabel();
+  }
+
+  function updateSiteBrandUi() {
+    var site = activeSite();
+    var brand = document.querySelector(".sidebar-brand-main");
+    if (brand) brand.textContent = site.brandTitle;
+    try {
+      document.title = site.brandTitle;
+    } catch (eT) {
+      /* ignore */
+    }
+    var tabs = document.querySelectorAll("[data-site-id]");
+    var i;
+    for (i = 0; i < tabs.length; i++) {
+      var btn = tabs[i];
+      var on = btn.getAttribute("data-site-id") === site.id;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+  }
+
+  function resetDashboardStateForSite() {
+    STATE.tractBase = null;
+    STATE.placesRaw = null;
+    STATE.placesManifest = null;
+    STATE.catalogByKey = null;
+    STATE.currentJoinedFc = null;
+    STATE.selectedMeasureKey = "";
+    STATE.selectedSurveyYear = null;
+    STATE.studyCircleFeat = null;
+    STATE.acsAgeRaw = null;
+    STATE.selectedAcsYear = null;
+    STATE.selectedAcsBaselineYear = null;
+    STATE.acsAgeFetched = false;
+    STATE.acsAgeFetchInFlight = false;
+    STATE.mapLayersReady = false;
+    tractCentroidByGeoid = Object.create(null);
+    clearHoverOnly();
+    var metricSel = document.getElementById("metric-select");
+    if (metricSel) {
+      while (metricSel.firstChild) metricSel.removeChild(metricSel.firstChild);
+      var ph = document.createElement("option");
+      ph.value = "";
+      ph.textContent = "Select a measure…";
+      metricSel.appendChild(ph);
+    }
+    var sy = document.getElementById("survey-year-select");
+    if (sy) {
+      sy.innerHTML = "";
+      sy.disabled = true;
+    }
+    var hist = document.getElementById("aging-histogram");
+    if (hist) hist.innerHTML = "";
+    var chartAcs = document.getElementById("chart-acs-total-pop");
+    if (chartAcs) chartAcs.innerHTML = "";
+    var chartPct = document.getElementById("chart-trend-pct");
+    if (chartPct) chartPct.innerHTML = "";
+    var chartCnt = document.getElementById("chart-trend-count");
+    if (chartCnt) chartCnt.innerHTML = "";
+    updateKpis(
+      { sumPop: 0, weightedMeanPct: null, sumCountEst: null, minYear: null, maxYear: null },
+      null
+    );
+  }
+
+  function switchSite(siteId) {
+    if (!SITES[siteId] || siteId === activeSiteId) return;
+    activeSiteId = siteId;
+    var site = activeSite();
+    STATE.studyRadiusMiles = clampStudyRadius(site.radiusDefault);
+    updateSiteBrandUi();
+    resetDashboardStateForSite();
+    if (map) {
+      try {
+        removeStudyFacilitiesFromMap();
+        if (map.getSource("tracts")) {
+          /* layers stay; data refreshed on load */
+        }
+      } catch (eRm) {
+        /* ignore */
+      }
+      map.jumpTo({ center: siteCenter(), zoom: site.defaultZoom });
+    }
+    wireStudyRadiusSlider();
+    runInitialDashboardLoad();
+  }
+
+  function wireSiteTabs() {
+    var root = document.getElementById("site-tabs");
+    if (!root || wireSiteTabs._wired) return;
+    wireSiteTabs._wired = true;
+    root.addEventListener("click", function (e) {
+      var t = e.target;
+      if (!t || !t.getAttribute) return;
+      var id = t.getAttribute("data-site-id");
+      if (!id) return;
+      switchSite(id);
+    });
+    updateSiteBrandUi();
   }
 
   /**
@@ -3124,12 +3276,17 @@
    * Runs after the Mapbox style loads when a token is present; otherwise still runs so charts populate.
    */
   function runInitialDashboardLoad() {
+    var site = activeSite();
     setLoading(
       true,
       "Loading census tract boundaries…",
-      "Reading local GeoJSON (50 mi radius of Saratoga Springs). Run scripts/build-tracts-local.js to rebuild."
+      "Reading local GeoJSON (" +
+        site.radiusMax +
+        " mi around " +
+        site.centerLabel +
+        "). Rebuild with npm run build:tracts or build:tracts:nyc."
     );
-    fetchGeoJsonOk(TRACT_BOUNDARIES_GEOJSON)
+    fetchGeoJsonOk(site.tracts)
       .then(function (tractFc) {
         var cleanFc = {
           type: "FeatureCollection",
@@ -3152,15 +3309,15 @@
           addStudyFacilitiesToMap();
           var bb = bboxFromFc(STATE.tractBase);
           if (bb) {
-            map.fitBounds(bb, { padding: 36, duration: 0, maxZoom: 10 });
+            map.fitBounds(bb, { padding: 36, duration: 0, maxZoom: 12 });
           }
         }
         setLoading(
           true,
           "Loading PLACES data…",
-          "Using study-area file PLACES_saratoga_50mi.geojson (run npm run build:places:study if missing)."
+          "Using study-area file " + pathBasename(site.places) + "."
         );
-        return fetchGeoJsonOk(PLACES_GEOJSON);
+        return fetchGeoJsonOk(site.places);
       })
       .then(function (placesFc) {
         var errEl = document.getElementById("data-load-error");
@@ -3173,7 +3330,7 @@
           features: placesFc && placesFc.features ? placesFc.features : [],
         };
         STATE.placesRaw = placesClean;
-        return fetch(resolveAssetUrl(PLACES_MANIFEST_URL))
+        return fetch(resolveAssetUrl(site.placesManifest))
           .then(function (r) {
             return r.ok ? r.json() : null;
           })
@@ -3198,8 +3355,8 @@
           errEl.textContent =
             "Could not load dashboard data. Check the browser console and verify files in /data exist. " +
             msg +
-            (String(msg).indexOf("PLACES_saratoga") >= 0
-              ? " The PLACES extract is large (~56 MB); GitHub Pages or slow networks may time out—try npm run dev locally."
+            (String(msg).indexOf("PLACES_") >= 0
+              ? " The PLACES extract is large; GitHub Pages or slow networks may time out—try npm run dev locally."
               : "");
         }
         wireUiAfterData();
@@ -3209,14 +3366,20 @@
       });
   }
 
+  function pathBasename(p) {
+    var s = String(p || "");
+    var i = Math.max(s.lastIndexOf("/"), s.lastIndexOf("\\"));
+    return i >= 0 ? s.slice(i + 1) : s;
+  }
+
   var mapboxTokenAtInit = getMapboxAccessToken();
   if (mapboxTokenAtInit) {
     mapboxgl.accessToken = mapboxTokenAtInit;
     map = new mapboxgl.Map({
       container: "map",
       style: MAPBOX_STYLES.light,
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
+      center: siteCenter(),
+      zoom: activeSite().defaultZoom,
       maxZoom: 19,
     });
     map.addControl(new mapboxgl.NavigationControl(), "top-left");

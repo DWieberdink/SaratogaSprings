@@ -1,0 +1,220 @@
+{
+  "surveyYears": [
+    2023,
+    2022,
+    2021,
+    2020
+  ],
+  "measureYearMatrix": {
+    "HLTHOUT|DEPRESSION": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "HLTHOUT|OBESITY": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "PREVENT|MAMMOUSE": [
+      2022,
+      2020
+    ],
+    "HLTHOUT|STROKE": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "HLTHOUT|ARTHRITIS": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "PREVENT|ACCESS2": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "HLTHOUT|DIABETES": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "RISKBEH|SLEEP": [
+      2022,
+      2020
+    ],
+    "RISKBEH|CSMOKING": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "HLTHOUT|COPD": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "PREVENT|COLON_SCREEN": [
+      2022,
+      2020
+    ],
+    "PREVENT|CERVICAL": [
+      2020
+    ],
+    "HLTHOUT|CHD": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "PREVENT|COREW": [
+      2020
+    ],
+    "PREVENT|DENTAL": [
+      2022,
+      2020
+    ],
+    "HLTHOUT|CASTHMA": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "RISKBEH|BINGE": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "HLTHSTAT|MHLTH": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "HLTHSTAT|GHLTH": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "HLTHSTAT|PHLTH": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "PREVENT|CHECKUP": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "RISKBEH|LPA": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "HLTHOUT|TEETHLOST": [
+      2022,
+      2020
+    ],
+    "HLTHOUT|CANCER": [
+      2023,
+      2022,
+      2021,
+      2020
+    ],
+    "PREVENT|COREM": [
+      2020
+    ],
+    "HLTHOUT|KIDNEY": [
+      2021,
+      2020
+    ],
+    "DISABLT|SELFCARE": [
+      2023,
+      2022,
+      2021
+    ],
+    "DISABLT|HEARING": [
+      2023,
+      2022,
+      2021
+    ],
+    "DISABLT|VISION": [
+      2023,
+      2022,
+      2021
+    ],
+    "DISABLT|DISABILITY": [
+      2023,
+      2022,
+      2021
+    ],
+    "HLTHOUT|BPHIGH": [
+      2023,
+      2021
+    ],
+    "DISABLT|MOBILITY": [
+      2023,
+      2022,
+      2021
+    ],
+    "PREVENT|CHOLSCREEN": [
+      2023,
+      2021
+    ],
+    "DISABLT|COGNITION": [
+      2023,
+      2022,
+      2021
+    ],
+    "PREVENT|BPMED": [
+      2023,
+      2021
+    ],
+    "DISABLT|INDEPLIVE": [
+      2023,
+      2022,
+      2021
+    ],
+    "HLTHOUT|HIGHCHOL": [
+      2023,
+      2021
+    ],
+    "SOCLNEED|EMOTIONSPT": [
+      2023
+    ],
+    "SOCLNEED|SHUTUTILITY": [
+      2023
+    ],
+    "SOCLNEED|FOODINSECU": [
+      2023
+    ],
+    "SOCLNEED|HOUSINSECU": [
+      2023
+    ],
+    "SOCLNEED|LACKTRPT": [
+      2023
+    ],
+    "SOCLNEED|FOODSTAMP": [
+      2023
+    ],
+    "SOCLNEED|LONELINESS": [
+      2023
+    ]
+  },
+  "tractPolygonVintage": "2020",
+  "generated_at": "2026-08-12T15:53:33.172Z",
+  "notes": "surveyYears = BRFSS survey years present in the bundled PLACES file. measureYearMatrix lists years available per categoryid|measureid."
+}

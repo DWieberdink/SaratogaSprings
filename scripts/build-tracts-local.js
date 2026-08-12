@@ -1,11 +1,12 @@
 /**
  * Builds a local census tract GeoJSON for the dashboard:
- * 1) Downloads NY / VT / MA tracts from Census TIGERweb (same queries as the old in-browser loader).
- * 2) Keeps tracts whose centroid lies within RADIUS_MILES (great-circle / "as the crow flies")
- *    of Saratoga Springs, NY.
+ * 1) Downloads tracts from Census TIGERweb for the requested state FIPS list.
+ * 2) Keeps tracts whose centroid lies within --radius miles (great-circle)
+ *    of --center.
  *
  * No npm dependencies — run with Node 18+:
  *   node scripts/build-tracts-local.js
+ *   node scripts/build-tracts-local.js --center -73.9903,40.7359 --radius 10 --states 36,34 --out data/tracts_union_square_10mi.geojson
  *
  * For polygon intersection clipping (smaller, exact boundaries vs. a disk), use:
  *   npm install && node scripts/build-clipped-tracts-turf.js
@@ -17,17 +18,64 @@ const path = require("path");
 
 var TIGER_TRACT_LAYER_ID = 8;
 
-var STATE_FIPS_LIST = [
-  { fips: "36", label: "New York" },
-  { fips: "50", label: "Vermont" },
-  { fips: "25", label: "Massachusetts" },
-];
+var STATE_LABELS = {
+  "36": "New York",
+  "50": "Vermont",
+  "25": "Massachusetts",
+  "34": "New Jersey",
+  "09": "Connecticut",
+};
 
-/** Saratoga Springs, NY — reference point (WGS84 lng, lat) */
-var SARATOGA_LNG_LAT = [-73.7846, 43.0831];
-var RADIUS_MILES = 50;
+function parseArgs(argv) {
+  var out = {
+    center: [-73.7846, 43.0831],
+    radiusMiles: 50,
+    states: ["36", "50", "25"],
+    outPath: path.join(__dirname, "..", "data", "tracts_saratoga_50mi.geojson"),
+    centerLabel: "Saratoga Springs, NY",
+  };
+  var i;
+  for (i = 2; i < argv.length; i++) {
+    if (argv[i] === "--center" && argv[i + 1]) {
+      var parts = String(argv[++i])
+        .split(",")
+        .map(function (x) {
+          return parseFloat(String(x).trim());
+        });
+      if (parts.length !== 2 || !isFinite(parts[0]) || !isFinite(parts[1])) {
+        throw new Error("--center must be lng,lat (e.g. -73.9903,40.7359)");
+      }
+      out.center = [parts[0], parts[1]];
+    } else if (argv[i] === "--radius" && argv[i + 1]) {
+      out.radiusMiles = parseFloat(argv[++i]);
+      if (!isFinite(out.radiusMiles) || out.radiusMiles <= 0) {
+        throw new Error("--radius must be a positive number of miles");
+      }
+    } else if (argv[i] === "--states" && argv[i + 1]) {
+      out.states = String(argv[++i])
+        .split(",")
+        .map(function (s) {
+          return String(s).trim().padStart(2, "0");
+        })
+        .filter(Boolean);
+      if (!out.states.length) throw new Error("--states must list at least one FIPS code");
+    } else if (argv[i] === "--out" && argv[i + 1]) {
+      out.outPath = path.resolve(process.cwd(), argv[++i]);
+    } else if (argv[i] === "--label" && argv[i + 1]) {
+      out.centerLabel = String(argv[++i]);
+    }
+  }
+  return out;
+}
 
-var OUT_FILE = path.join(__dirname, "..", "data", "tracts_saratoga_50mi.geojson");
+var ARGS = parseArgs(process.argv);
+var STATE_FIPS_LIST = ARGS.states.map(function (fips) {
+  return { fips: fips, label: STATE_LABELS[fips] || "State " + fips };
+});
+var CENTER_LNG_LAT = ARGS.center;
+var RADIUS_MILES = ARGS.radiusMiles;
+var OUT_FILE = ARGS.outPath;
+var CENTER_LABEL = ARGS.centerLabel;
 
 function fetchJson(url) {
   return fetch(url).then(function (r) {
@@ -111,6 +159,7 @@ function coerceGeoids(fc) {
 function fetchTractsWithLayer(layerId) {
   return Promise.all(
     STATE_FIPS_LIST.map(function (s) {
+      console.log("  Fetching", s.label, "(" + s.fips + ")…");
       return fetchAllTractsForState(s.fips, layerId);
     })
   ).then(function (parts) {
@@ -118,7 +167,7 @@ function fetchTractsWithLayer(layerId) {
   });
 }
 
-function fetchTractsThreeStates() {
+function fetchTractsRequestedStates() {
   return fetchTractsWithLayer(TIGER_TRACT_LAYER_ID).catch(function (err) {
     console.warn(
       "Layer",
@@ -202,16 +251,23 @@ function filterByCentroidRadius(fc, centerLngLat, radiusMi) {
 }
 
 function main() {
-  console.log("Fetching census tracts (NY, VT, MA) from TIGERweb…");
-  return fetchTractsThreeStates()
+  var stateNames = STATE_FIPS_LIST.map(function (s) {
+    return s.label;
+  }).join(", ");
+  console.log(
+    "Fetching census tracts (" + stateNames + ") from TIGERweb for",
+    CENTER_LABEL + "…"
+  );
+  return fetchTractsRequestedStates()
     .then(function (merged) {
       console.log("Downloaded features:", merged.features.length);
 
-      var clipped = filterByCentroidRadius(merged, SARATOGA_LNG_LAT, RADIUS_MILES);
+      var clipped = filterByCentroidRadius(merged, CENTER_LNG_LAT, RADIUS_MILES);
       console.log(
         "Tracts with centroid within",
         RADIUS_MILES,
-        "mi of Saratoga Springs:",
+        "mi of",
+        CENTER_LABEL + ":",
         clipped.features.length
       );
 
@@ -220,14 +276,19 @@ function main() {
         features: clipped.features,
         meta: {
           description:
-            "Census tracts in NY, VT, and MA whose tract centroids lie within a " +
+            "Census tracts in " +
+            stateNames +
+            " whose tract centroids lie within a " +
             RADIUS_MILES +
-            "-mile great-circle radius of Saratoga Springs, NY. Full tract geometries are retained.",
-          center_wgs84_lng_lat: SARATOGA_LNG_LAT,
+            "-mile great-circle radius of " +
+            CENTER_LABEL +
+            ". Full tract geometries are retained.",
+          center_wgs84_lng_lat: CENTER_LNG_LAT,
+          center_label: CENTER_LABEL,
           radius_miles: RADIUS_MILES,
           selection: "centroid_within_radius",
           source: "US Census Bureau TIGERweb (Current census tracts)",
-          states_included: ["36", "50", "25"],
+          states_included: ARGS.states.slice(),
           generated_at: new Date().toISOString(),
           note:
             "For polygon intersection against a true circle (trimmed boundaries), run scripts/build-clipped-tracts-turf.js after npm install @turf/turf.",
